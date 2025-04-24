@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+  <rect width="48" height="48" fill="#FFFFFF" rx="8" ry="8"/>
+  <polygon points="24,6 31,16 17,16" fill="#006233"/>
+  <path d="M12,18 C12,18 24,32 36,18" stroke="#C1272D" stroke-width="4" fill="none"/>
+  <path d="M14,22 C14,22 24,34 34,22" stroke="#C1272D" stroke-width="4" fill="none"/>
+  <text x="24" y="42" font-family="Arial" font-size="6" font-weight="bold" text-anchor="middle" fill="#000000">MA</text>
+</svg>
