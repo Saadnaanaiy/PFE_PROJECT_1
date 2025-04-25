@@ -1,15 +1,15 @@
-import { useState } from 'react'
-import { motion } from 'framer-motion'
-import { FiChevronLeft, FiChevronRight } from 'react-icons/fi'
-import CourseCard from './CourseCard'
+import { useState } from 'react';
+import { motion } from 'framer-motion';
+import { FiChevronLeft, FiChevronRight } from 'react-icons/fi';
+import CourseCard from './CourseCard';
 
 const CoursesList = ({ title, subtitle, courses, showViewAll = true }) => {
-  const [activeTab, setActiveTab] = useState("All")
-  const tabs = ["All", "Popular", "New", "Data Science", "Design", "Business"]
+  const [activeTab, setActiveTab] = useState('All');
+  const tabs = ['All', 'Popular', 'New', 'Data Science', 'Design', 'Business'];
 
   // Filter courses based on active tab
   // In a real app, this would be handled by an API call
-  const filteredCourses = courses
+  const filteredCourses = courses;
 
   return (
     <section className="py-16">
@@ -22,14 +22,14 @@ const CoursesList = ({ title, subtitle, courses, showViewAll = true }) => {
             <h2 className="heading-lg">{title}</h2>
             {subtitle && <p className="text-neutral-600 mt-2">{subtitle}</p>}
           </div>
-          
+
           {showViewAll && (
             <button className="btn-outline self-start md:self-auto">
               View All Courses
             </button>
           )}
         </div>
-        
+
         {/* Category tabs */}
         <div className="mb-8 overflow-x-auto scrollbar-hidden">
           <div className="flex space-x-2 md:space-x-4 pb-2">
@@ -48,29 +48,24 @@ const CoursesList = ({ title, subtitle, courses, showViewAll = true }) => {
             ))}
           </div>
         </div>
-        
+
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {filteredCourses.map((course) => (
             <CourseCard key={course.id} course={course} />
           ))}
         </div>
-        
+
         {/* Pagination/Navigation for mobile */}
         <div className="flex justify-center mt-10 md:hidden">
-          <button 
-            className="w-10 h-10 rounded-full flex items-center justify-center border border-neutral-300 text-neutral-700 mr-3 hover:bg-neutral-100"
-          >
+          <button className="w-10 h-10 rounded-full flex items-center justify-center border border-neutral-300 text-neutral-700 mr-3 hover:bg-neutral-100">
             <FiChevronLeft className="w-5 h-5" />
           </button>
-          <button 
-            className="w-10 h-10 rounded-full flex items-center justify-center border border-neutral-300 text-neutral-700 hover:bg-neutral-100"
-          >
+          <button className="w-10 h-10 rounded-full flex items-center justify-center border border-neutral-300 text-neutral-700 hover:bg-neutral-100">
             <FiChevronRight className="w-5 h-5" />
           </button>
         </div>
       </div>
     </section>
-  )
-}
-
-export default CoursesList
+  );
+};
+export default CoursesList;

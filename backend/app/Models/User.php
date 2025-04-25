@@ -1,48 +1,72 @@
 <?php
-
+// app/Models/User.php
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
-    /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable;
+   use Notifiable;
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var list<string>
-     */
     protected $fillable = [
-        'name',
-        'email',
-        'password',
+        'nom', 'email', 'password', 'role',
     ];
 
-    /**
-     * The attributes that should be hidden for serialization.
-     *
-     * @var list<string>
-     */
     protected $hidden = [
-        'password',
-        'remember_token',
+        'password', 'remember_token',
     ];
 
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
-    protected function casts(): array
+    protected $casts = [
+        'email_verified_at' => 'datetime',
+    ];
+
+    public function administrateur()
     {
-        return [
-            'email_verified_at' => 'datetime',
-            'password' => 'hashed',
-        ];
+        return $this->hasOne(Administrateur::class);
+    }
+
+    public function instructeur()
+    {
+        return $this->hasOne(Instructeur::class);
+    }
+
+    public function etudiant()
+    {
+        return $this->hasOne(Etudiant::class);
+    }
+
+    public function messages()
+    {
+        return $this->hasMany(Message::class);
+    }
+
+    public function panier()
+    {
+        return $this->hasOne(Panier::class)->where('is_active', true);
+    }
+
+    public function paniers()
+    {
+        return $this->hasMany(Panier::class);
+    }
+
+    // Helper method to check if user is admin
+    public function isAdmin()
+    {
+        return $this->role === 'administrateur';
+    }
+
+    // Helper method to check if user is instructor
+    public function isInstructeur()
+    {
+        return $this->role === 'instructeur';
+    }
+
+    // Helper method to check if user is student
+    public function isEtudiant()
+    {
+        return $this->role === 'etudiant';
     }
 }

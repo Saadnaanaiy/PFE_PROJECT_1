@@ -10,6 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "axios": "^1.9.0",
     "framer-motion": "^11.0.8",
     "marocademy": "file:",
     "react": "^18.3.1",

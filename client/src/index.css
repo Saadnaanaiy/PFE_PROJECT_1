@@ -13,11 +13,16 @@
 body {
   margin: 0;
   font-family: 'Inter', system-ui, sans-serif;
-  background-color: #F9F9F7;
+  background-color: #f9f9f7;
   color: #262621;
 }
 
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   font-family: 'Poppins', sans-serif;
   line-height: 1.2;
 }
@@ -26,36 +31,259 @@ h1, h2, h3, h4, h5, h6 {
   .btn {
     @apply inline-flex items-center justify-center px-4 py-2 rounded-md font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2;
   }
-  
+
   .btn-primary {
     @apply btn bg-primary text-white hover:bg-primary-dark focus:ring-primary;
   }
-  
+
   .btn-secondary {
     @apply btn bg-secondary text-white hover:bg-secondary-dark focus:ring-secondary;
   }
-  
+
   .btn-outline {
     @apply btn border border-primary text-primary hover:bg-primary hover:text-white focus:ring-primary;
   }
-  
+
   .container-custom {
     @apply px-4 mx-auto max-w-7xl sm:px-6 lg:px-8;
   }
-  
+
   .heading-xl {
     @apply text-4xl font-bold md:text-5xl;
   }
-  
+
   .heading-lg {
     @apply text-3xl font-bold md:text-4xl;
   }
-  
+
   .heading-md {
     @apply text-2xl font-bold md:text-3xl;
   }
-  
+
   .course-card {
     @apply bg-white rounded-lg overflow-hidden shadow-card transition-all duration-300 hover:shadow-card-hover;
   }
+}
+
+/* Zelij Pattern Styles */
+.zelij-pattern {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: transparent;
+  background-image: linear-gradient(#1e40af33 1px, transparent 1px),
+    linear-gradient(90deg, #1e40af33 1px, transparent 1px),
+    linear-gradient(#1e40af22 0.5px, transparent 0.5px),
+    linear-gradient(90deg, #1e40af22 0.5px, transparent 0.5px),
+    repeating-conic-gradient(transparent 0% 25%, #b91c1c22 25% 50%),
+    repeating-conic-gradient(transparent 0% 25%, #047857aa 25% 50%);
+  background-size: 50px 50px, 50px 50px, 10px 10px, 10px 10px, 100px 100px,
+    100px 100px;
+  background-position: 0px 0px, 0px 0px, 0px 0px, 0px 0px, 0px 0px, 50px 50px;
+  animation: zelij-animation 40s linear infinite;
+  opacity: 0.1;
+}
+
+@keyframes zelij-animation {
+  from {
+    background-position: 0px 0px, 0px 0px, 0px 0px, 0px 0px, 0px 0px, 50px 50px;
+  }
+  to {
+    background-position: 100px 0px, 100px 0px, 20px 0px, 20px 0px, 100px 100px,
+      150px 150px;
+  }
+}
+
+.section-divider {
+  height: 8px;
+  margin: 2rem 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    #047857 20%,
+    #1e40af 40%,
+    #b91c1c 60%,
+    #047857 80%,
+    transparent 100%
+  );
+  position: relative;
+  opacity: 0.7;
+}
+
+.section-divider::before {
+  content: '';
+  position: absolute;
+  top: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 16px;
+  height: 16px;
+  background-color: white;
+  border: 2px solid #047857;
+  transform: rotate(45deg);
+}
+
+.heading-lg {
+  position: relative;
+  display: inline-block;
+}
+
+
+
+.zelij-border {
+  position: relative;
+  --zelij-color: #047857;
+}
+
+.zelij-border::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 8px;
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 5px,
+    var(--zelij-color) 5px,
+    var(--zelij-color) 10px
+  );
+  opacity: 0.7;
+}
+
+.zelij-card {
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.3s ease;
+}
+
+.zelij-card:hover {
+  transform: translateY(-5px);
+}
+
+.zelij-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 5px;
+  background: linear-gradient(90deg, #047857 0%, #1e40af 50%, #b91c1c 100%);
+}
+
+/* Moroccan Zelij Particle Effect */
+.zelij-particles {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  opacity: 0.8;
+}
+
+.zelij-particles::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 35%;
+  height: 100%;
+  background-image: radial-gradient(
+      circle at center,
+      transparent 30%,
+      #00000010 70%,
+      transparent 100%
+    ),
+    repeating-conic-gradient(
+      from 0deg,
+      #e6582a 0deg 30deg,
+      #127fa3 30deg 60deg,
+      #f2b73f 60deg 90deg,
+      #7c2529 90deg 120deg,
+      #86b1b8 120deg 150deg,
+      #a95228 150deg 180deg,
+      #0f4260 180deg 210deg,
+      #e6582a 210deg 240deg,
+      #127fa3 240deg 270deg,
+      #f2b73f 270deg 300deg,
+      #7c2529 300deg 330deg,
+      #86b1b8 330deg 360deg
+    );
+  background-size: 60px 60px, 80px 80px;
+  opacity: 0.2;
+  mask-image: linear-gradient(to right, black 0%, black 70%, transparent 100%);
+  -webkit-mask-image: linear-gradient(
+    to right,
+    black 0%,
+    black 70%,
+    transparent 100%
+  );
+}
+
+.zelij-dot {
+  position: absolute;
+  border-radius: 50%;
+  opacity: 0.6;
+  animation: float 30s infinite linear;
+  will-change: transform, opacity;
+}
+
+@keyframes float {
+  0% {
+    transform: translateX(0) translateY(0);
+    opacity: 0.7;
+  }
+  20% {
+    opacity: 0.7;
+  }
+  100% {
+    transform: translateX(calc(80vw + 100px)) translateY(calc(5vh - 10px));
+    opacity: 0;
+  }
+}
+
+/* Authentic Zelij Styles */
+.authentic-zelij {
+  position: relative;
+  overflow: hidden;
+  background-color: rgba(255, 255, 255, 0.5);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.authentic-zelij::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: repeating-linear-gradient(
+      45deg,
+      rgba(230, 88, 42, 0.15) 0px,
+      rgba(230, 88, 42, 0.15) 4px,
+      transparent 4px,
+      transparent 8px
+    ),
+    repeating-linear-gradient(
+      -45deg,
+      rgba(18, 127, 163, 0.15) 0px,
+      rgba(18, 127, 163, 0.15) 4px,
+      transparent 4px,
+      transparent 8px
+    ),
+    radial-gradient(
+      circle at 50% 50%,
+      rgba(242, 183, 63, 0.07) 0%,
+      rgba(124, 37, 41, 0.07) 50%,
+      transparent 100%
+    );
+  background-size: 24px 24px, 24px 24px, 100% 100%;
+  background-position: 0 0, 0 0, 0 0;
+  opacity: 0.4;
+  z-index: -1;
 }

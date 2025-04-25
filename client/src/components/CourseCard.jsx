@@ -1,12 +1,12 @@
-import React, { useState } from 'react'
-import { motion } from 'framer-motion'
-import { FiStar, FiClock, FiUser, FiShoppingCart, FiCheck } from 'react-icons/fi'
-import { Link, useNavigate } from 'react-router-dom'
+import React, { useState } from 'react';
+import { motion } from 'framer-motion';
+import { FiStar, FiClock, FiUser, FiShoppingCart, FiCheck } from 'react-icons/fi';
+import { Link, useNavigate } from 'react-router-dom';
 
 const CourseCard = ({ course }) => {
-  const navigate = useNavigate()
-  const [isInCart, setIsInCart] = useState(false)
-  const [showNotification, setShowNotification] = useState(false)
+  const navigate = useNavigate();
+  const [isInCart, setIsInCart] = useState(false);
+  const [showNotification, setShowNotification] = useState(false);
   const {
     id,
     title,
@@ -19,26 +19,25 @@ const CourseCard = ({ course }) => {
     price,
     discountPrice,
     category,
-  } = course
+  } = course;
 
   const handleClick = (e) => {
-    e.preventDefault()
-    navigate(`/course/${id}`)
-  }
+    e.preventDefault();
+    navigate(`/course/${id}`);
+  };
 
   const handleAddToCart = (e) => {
-    e.stopPropagation() // Prevent navigation to course detail
+    e.stopPropagation(); // Prevent navigation to course detail
     if (!isInCart) {
-      setIsInCart(true)
-      setShowNotification(true)
+      setIsInCart(true);
+      setShowNotification(true);
 
       // Hide notification after 3 seconds
       setTimeout(() => {
-        setShowNotification(false)
-      }, 3000)
+        setShowNotification(false);
+      }, 3000);
     }
-  }
-
+  };
   return (
     <motion.div
       className="course-card group relative"
@@ -63,8 +62,8 @@ const CourseCard = ({ course }) => {
             onClick={handleAddToCart}
             className={`absolute top-3 right-3 w-10 h-10 rounded-full flex items-center justify-center transition-colors duration-300 ${
               isInCart
-              ? 'bg-secondary text-white'
-              : 'bg-white text-secondary hover:bg-secondary hover:text-white'
+                ? 'bg-secondary text-white'
+                : 'bg-white text-secondary hover:bg-secondary hover:text-white'
             }`}
             aria-label={isInCart ? 'Added to cart' : 'Add to cart'}
           >
@@ -129,7 +128,7 @@ const CourseCard = ({ course }) => {
         </div>
       )}
     </motion.div>
-  )
-}
+  );
+};
 
-export default CourseCard
+export default CourseCard;

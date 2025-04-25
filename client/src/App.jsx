@@ -14,15 +14,38 @@ import CategoriesList from './pages/CategoriesList';
 import CategoryCourses from './pages/CategoryCourses';
 import InstructorsList from './pages/InstructorsList';
 import InstructorProfile from './pages/InstructorProfile';
+import { useState, useEffect } from 'react';
+import CourseVideoView from './components/CourseVideoView';
 
 function App() {
+  // State to track when we should hide header and footer (for video learning experience)
+  const [isFullScreenRoute, setIsFullScreenRoute] = useState(false);
+
+  // Monitor route changes to determine when to hide the header and footer
+  const checkFullScreenRoute = () => {
+    const path = window.location.pathname;
+    const isCourseViewRoute =
+      path.includes('/course/') && path.includes('/learn');
+    setIsFullScreenRoute(isCourseViewRoute);
+  };
+
+  useEffect(() => {
+    checkFullScreenRoute();
+    window.addEventListener('popstate', checkFullScreenRoute);
+    return () => window.removeEventListener('popstate', checkFullScreenRoute);
+  }, []);
+
   return (
     <div className="flex flex-col min-h-screen">
-      <Header />
-      <main className="flex-grow">
+      {!isFullScreenRoute && <Header />}
+      <main className={`${isFullScreenRoute ? '' : 'flex-grow'}`}>
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/course/:courseId" element={<CourseDetails />} />
+          <Route
+            path="/course/:courseId/learn"
+            element={<CourseVideoView onBack={() => window.history.back()} />}
+          />
           <Route path="/courses" element={<CoursesList />} />
           <Route path="/categories" element={<CategoriesList />} />
           <Route path="/categories/:categoryId" element={<CategoryCourses />} />
@@ -39,7 +62,7 @@ function App() {
           <Route path="/payment-success" element={<PaymentSuccess />} />
         </Routes>
       </main>
-      <Footer />
+      {!isFullScreenRoute && <Footer />}
     </div>
   );
 }

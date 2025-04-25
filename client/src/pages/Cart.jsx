@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { FiShoppingBag, FiChevronLeft, FiTrash2 } from 'react-icons/fi';
+import { FiTrash2, FiShoppingBag, FiArrowLeft } from 'react-icons/fi';
 import CartItem from '../components/CartItem';
 
 const Cart = () => {
@@ -58,40 +57,51 @@ const Cart = () => {
   const total = subtotal + tax;
 
   return (
-    <div className="bg-neutral-50 py-12">
+    <div className="bg-neutral-50 py-12 min-h-screen">
       <div className="container-custom">
         {/* Page Header */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="mb-8"
-        >
-          <h1 className="heading-lg mb-2">Your Cart</h1>
-          <div className="flex items-center text-neutral-600">
-            <Link to="/" className="flex items-center hover:text-primary">
-              <FiChevronLeft className="mr-1" />
-              Continue Shopping
-            </Link>
-            {cartItems.length > 0 && (
-              <button
-                onClick={clearCart}
-                className="ml-auto flex items-center text-red-500 hover:text-red-600"
+        <div className="mb-8 bg-white shadow-sm rounded-lg overflow-hidden">
+          <div className="border-b border-neutral-100 px-6 py-5 flex flex-col md:flex-row md:items-center md:justify-between">
+            <div>
+              <h1 className="heading-lg mb-1 text-neutral-800">
+                Shopping Cart
+              </h1>
+              <p className="text-neutral-500">
+                {cartItems.length > 0
+                  ? `${cartItems.length} course${
+                      cartItems.length > 1 ? 's' : ''
+                    } in your cart`
+                  : 'Your cart is currently empty'}
+              </p>
+            </div>
+            <div className="mt-4 md:mt-0 flex items-center">
+              <Link
+                to="/"
+                className="flex items-center text-primary font-medium hover:text-primary-dark transition-colors"
               >
-                <FiTrash2 className="mr-1" />
-                Clear Cart
-              </button>
-            )}
+                <FiArrowLeft className="mr-2" size={16} />
+                Continue Shopping
+              </Link>
+              {cartItems.length > 0 && (
+                <button
+                  onClick={clearCart}
+                  className="ml-8 flex items-center text-neutral-600 hover:text-red-500 transition-colors"
+                >
+                  <FiTrash2 className="mr-2" size={16} />
+                  Clear Cart
+                </button>
+              )}
+            </div>
           </div>
-        </motion.div>
+        </div>
 
         {/* Cart Content */}
         <div className="grid md:grid-cols-3 gap-8">
           {/* Cart Items */}
           <div className="md:col-span-2">
-            <div className="bg-white rounded-xl shadow-card p-6">
+            <div className="bg-white rounded-lg shadow-sm overflow-hidden">
               {cartItems.length > 0 ? (
-                <div className="divide-y divide-neutral-200">
+                <div className="divide-y divide-neutral-100">
                   {cartItems.map((item) => (
                     <CartItem
                       key={item.id}
@@ -102,18 +112,22 @@ const Cart = () => {
                   ))}
                 </div>
               ) : (
-                <div className="py-12 text-center">
-                  <div className="flex justify-center mb-4">
-                    <FiShoppingBag className="w-16 h-16 text-neutral-300" />
+                <div className="py-20 px-6 text-center">
+                  <div className="mx-auto w-16 h-16 bg-neutral-100 rounded-full flex items-center justify-center mb-6">
+                    <FiShoppingBag className="text-primary" size={28} />
                   </div>
-                  <h3 className="text-xl font-medium mb-2">
+                  <h3 className="text-xl font-medium mb-3 text-neutral-800">
                     Your cart is empty
                   </h3>
-                  <p className="text-neutral-600 mb-6">
-                    Looks like you haven't added any courses to your cart yet.
+                  <p className="text-neutral-600 mb-8 max-w-md mx-auto">
+                    Looks like you haven&apos;t added any courses to your cart
+                    yet. Browse our catalog to find courses that interest you.
                   </p>
-                  <Link to="/" className="btn-primary py-2.5 px-6">
-                    Browse Courses
+                  <Link
+                    to="/"
+                    className="btn-primary py-2.5 px-8 rounded-md inline-flex items-center hover:bg-primary-dark transition-colors"
+                  >
+                    Explore Courses
                   </Link>
                 </div>
               )}
@@ -123,36 +137,38 @@ const Cart = () => {
           {/* Order Summary */}
           {cartItems.length > 0 && (
             <div className="md:col-span-1">
-              <div className="bg-white rounded-xl shadow-card p-6 sticky top-24">
-                <h2 className="font-heading text-xl font-semibold mb-6">
+              <div className="bg-white rounded-lg shadow-sm p-6 sticky top-24">
+                <h2 className="font-heading text-xl font-semibold mb-6 pb-3 border-b text-neutral-800">
                   Order Summary
                 </h2>
 
-                <div className="space-y-3 text-neutral-600 mb-6">
+                <div className="space-y-4 text-neutral-600 mb-8">
                   <div className="flex justify-between">
                     <span>Subtotal</span>
-                    <span>{subtotal.toFixed(2)} MAD</span>
+                    <span className="font-medium text-neutral-800">
+                      {subtotal.toFixed(2)} MAD
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span>VAT (20%)</span>
                     <span>{tax.toFixed(2)} MAD</span>
                   </div>
-                  <div className="h-px bg-neutral-200 my-2"></div>
-                  <div className="flex justify-between font-bold text-neutral-800">
+                  <div className="h-px bg-neutral-200 my-3"></div>
+                  <div className="flex justify-between font-bold text-lg">
                     <span>Total</span>
-                    <span>{total.toFixed(2)} MAD</span>
+                    <span className="text-primary">{total.toFixed(2)} MAD</span>
                   </div>
                 </div>
 
                 <button
                   onClick={() => navigate('/checkout')}
-                  className="btn-primary w-full py-3"
+                  className="btn-primary w-full py-3 rounded-md hover:bg-primary-dark transition-colors font-medium"
                 >
                   Proceed to Checkout
                 </button>
 
-                <div className="mt-4 text-sm text-center text-neutral-500">
-                  Secure payment powered by Moroccan payment providers
+                <div className="mt-6 text-center text-sm text-neutral-500 bg-neutral-50 rounded-md p-3">
+                  Secure checkout powered by trusted payment providers
                 </div>
               </div>
             </div>
