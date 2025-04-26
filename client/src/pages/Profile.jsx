@@ -17,6 +17,7 @@ const Profile = () => {
       try {
         const response = await axios.get('http://localhost:8000/api/users');
         setUsers(response.data.users);
+        console.log('Users:', response.data.users);
         setLoading(false);
       } catch (error) {
         console.error('Error fetching users:', error);
@@ -206,7 +207,12 @@ const Profile = () => {
             <div className="bg-white rounded-xl shadow-card overflow-hidden">
               <div className="p-6 text-center">
                 <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
-                  <FiUser className="w-8 h-8 text-primary" />
+                  {/* <FiUser className="w-8 h-8 text-primary" /> */}
+                  <img 
+                      src={user?.image} 
+                      alt="Photo de profil" 
+                      className="w-full h-full object-cover"  
+                    />
                 </div>
                 <h3 className="font-heading font-semibold mb-1">{user?.nom || 'Student'}</h3>
                 <p className="text-sm text-neutral-600 mb-4">{user?.email || 'No email available'}</p>

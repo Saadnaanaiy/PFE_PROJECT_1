@@ -2,25 +2,30 @@
 // app/Models/Cours.php
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Cours extends Model
 {
+    use HasFactory;
+
     protected $fillable = [
-        'titre', 'description', 'prix', 'niveau',
-        'estPublic', 'dateCreation', 'dureeMinutes',
-        'categorie_id', 'instructeur_id'
+        'titre',
+        'description',
+        'prix',
+        'niveau',
+        'estPublic',
+        'dateCreation',
+        'dureeMinutes',
+        'instructeur_id',
+        'categorie_id'
     ];
 
     protected $casts = [
         'estPublic' => 'boolean',
         'dateCreation' => 'datetime',
+        'prix' => 'float'
     ];
-
-    public function categorie()
-    {
-        return $this->belongsTo(Categorie::class);
-    }
 
     public function instructeur()
     {
@@ -32,38 +37,19 @@ class Cours extends Model
         return $this->hasMany(Section::class);
     }
 
-    public function ressources()
+    public function etudiants()
     {
-        return $this->hasMany(Ressource::class);
+        return $this->belongsToMany(Etudiant::class, 'etudiant_cours')
+            ->withTimestamps();
     }
 
-    public function evaluations()
+    public function categorie()
     {
-        return $this->hasMany(Evaluation::class);
+        return $this->belongsTo(Categorie::class);
     }
 
     public function forums()
     {
         return $this->hasMany(Forum::class);
-    }
-
-    public function inscriptions()
-    {
-        return $this->hasMany(Inscription::class);
-    }
-
-    public function etudiants()
-    {
-        return $this->belongsToMany(Etudiant::class, 'inscriptions');
-    }
-
-    public function panierItems()
-    {
-        return $this->hasMany(PanierItem::class);
-    }
-
-    public function paniers()
-    {
-        return $this->belongsToMany(Panier::class, 'panier_items');
     }
 }

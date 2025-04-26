@@ -10,67 +10,74 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Facades\Gate; // Add Gate facade
+use Illuminate\Support\Facades\Gate;
 
 class UserController extends Controller
 {
-   // Assuming you're using Laravel
-
-public function register(Request $request)
-{
-    // Validate the request
-    $request->validate([
-        'nom' => 'required|string|max:255',
-        'email' => 'required|string|email|max:255|unique:users',
-        'password' => 'required|string|min:6|confirmed',
-        'role' => 'required|string|in:student,instructor',
-    ]);
-
-    // Start a database transaction
-    DB::beginTransaction();
-
-    try {
-        // Create the user
-        $user = User::create([
-            'nom' => $request->nom,
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
-            'role' => $request->role,
+    public function register(Request $request)
+    {
+        // Validation de la requête
+        $request->validate([
+            'nom' => 'required|string|max:255',
+            'email' => 'required|string|email|max:255|unique:users',
+            'password' => 'required|string|min:6|confirmed',
+            'role' => 'required|string|in:etudiant,instructeur,administrateur', // Modifié pour les rôles en français
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:10048',
+            'bio' => 'required_if:role,instructeur|string|max:500', // Modifié pour les rôles en français
+            'specialite' => 'required_if:role,instructeur|string|max:255', // Modifié pour les rôles en français
         ]);
 
-        // Based on role, create corresponding record
-        if ($request->role === 'student') {
-            // Create student record
-            Etudiant::create([
-                'user_id' => $user->id,
+        // Démarrer une transaction de base de données
+        DB::beginTransaction();
+
+        try {
+            $imagePath = null;
+            if ($request->hasFile('image')) {
+                $imagePath = $request->file('image')->store('images', 'public');
+            }
+            // Créer l'utilisateur
+            $user = User::create([
                 'nom' => $request->nom,
-                // Add any other student-specific fields
+                'email' => $request->email,
+                'password' => Hash::make($request->password),
+                'role' => $request->role,
+                'image' => $imagePath,
             ]);
-        } else if ($request->role === 'instructor') {
-            // Create instructor record
-            Instructeur::create([
-                'user_id' => $user->id,
-                'nom' => $request->nom,
-                // Add any other instructor-specific fields
-            ]);
+
+            // En fonction du rôle, créer l'enregistrement correspondant
+            if ($request->role === 'etudiant') {
+                // Créer l'enregistrement étudiant
+                Etudiant::create([
+                    'user_id' => $user->id,
+                    'image' => $imagePath,
+                    // Ajouter d'autres champs spécifiques aux étudiants si nécessaire
+                ]);
+            } else if ($request->role === 'instructeur') {
+                // Créer l'enregistrement instructeur
+                Instructeur::create([
+                    'user_id' => $user->id,
+                    'bio' => $request->bio,
+                    'specialite' => $request->specialite,
+                    'image' => $imagePath,
+                ]);
+            }
+
+            // Valider la transaction
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Utilisateur enregistré avec succès',
+                'user' => $user
+            ], 201);
+        } catch (\Exception $e) {
+            // Annuler la transaction en cas d'échec
+            DB::rollBack();
+            return response()->json([
+                'message' => 'Échec de l\'enregistrement',
+                'error' => $e->getMessage()
+            ], 500);
         }
-
-        // Commit the transaction
-        DB::commit();
-
-        return response()->json([
-            'message' => 'User successfully registered',
-            'user' => $user
-        ], 201);
-    } catch (\Exception $e) {
-        // Rollback the transaction in case of failure
-        DB::rollBack();
-        return response()->json([
-            'message' => 'Registration failed',
-            'error' => $e->getMessage()
-        ], 500);
     }
-}
 
     public function login(Request $request)
     {
@@ -85,7 +92,7 @@ public function register(Request $request)
 
         if (!Auth::attempt($request->only('email', 'password'))) {
             return response()->json([
-                'message' => 'Invalid login credentials'
+                'message' => 'Identifiants de connexion invalides'
             ], 401);
         }
 
@@ -93,7 +100,7 @@ public function register(Request $request)
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
-            'message' => 'Login successful',
+            'message' => 'Connexion réussie',
             'access_token' => $token,
             'token_type' => 'Bearer',
         ]);
@@ -104,7 +111,7 @@ public function register(Request $request)
         auth()->user()->tokens()->delete();
         
         return response()->json([
-            'message' => 'Successfully logged out'
+            'message' => 'Déconnexion réussie'
         ]);
     }
 
@@ -142,20 +149,20 @@ public function register(Request $request)
         $user->save();
 
         return response()->json([
-            'message' => 'Profile updated successfully',
+            'message' => 'Profil mis à jour avec succès',
             'user' => $user
         ]);
     }
 
     /**
-     * Get a list of all users.
-     * Potentially restrict this to admins in the future.
+     * Obtenir une liste de tous les utilisateurs.
+     * Potentiellement restreindre cela aux administrateurs à l'avenir.
      */
     public function index()
     {
-        // Optional: Add authorization check (e.g., only allow admins)
+        // Optionnel: Ajouter une vérification d'autorisation (ex., uniquement pour les administrateurs)
         // if (!Gate::allows('view-users')) {
-        //     return response()->json(['message' => 'Forbidden'], 403);
+        //     return response()->json(['message' => 'Interdit'], 403);
         // }
         
         $users = User::all();
@@ -163,31 +170,31 @@ public function register(Request $request)
     }
 
     /**
-     * Get a list of users with the 'instructor' role.
+     * Obtenir une liste des utilisateurs avec le rôle 'instructeur'.
      */
     public function getInstructors()
     {
-        // Optional: Add authorization if needed
+        // Optionnel: Ajouter une autorisation si nécessaire
         // if (!Gate::allows('view-instructors')) {
-        //     return response()->json(['message' => 'Forbidden'], 403);
+        //     return response()->json(['message' => 'Interdit'], 403);
         // }
 
-        $instructors = User::where('role', 'instructeur')->with('instructeur')->get(); // Eager load instructor details
+        $instructors = User::where('role', 'instructeur')->with('instructeur')->get(); // Chargement empressé des détails de l'instructeur
         return response()->json(['instructors' => $instructors]);
     }
 
     /**
-     * Get details for a specific user.
-     * Potentially restrict access based on roles.
+     * Obtenir les détails d'un utilisateur spécifique.
+     * Potentiellement restreindre l'accès en fonction des rôles.
      */
-    public function show(User $user) // Use route model binding
+    public function show(User $user) // Utiliser la liaison de modèle de route
     {
-        // Optional: Add authorization check
+        // Optionnel: Ajouter une vérification d'autorisation
         // if (!Gate::allows('view-user', $user)) {
-        //     return response()->json(['message' => 'Forbidden'], 403);
+        //     return response()->json(['message' => 'Interdit'], 403);
         // }
 
-        // Load related data if needed, e.g., instructor details
+        // Charger les données associées si nécessaire, par exemple, les détails de l'instructeur
         if ($user->isInstructeur()) {
             $user->load('instructeur');
         } elseif ($user->isEtudiant()) {
@@ -200,7 +207,7 @@ public function register(Request $request)
     public function update(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'name' => 'string|max:255',
+            'nom' => 'string|max:255',
             'email' => 'string|email|max:255|unique:users,email,' . auth()->id(),
             'password' => 'string|min:8|confirmed',
         ]);
@@ -211,8 +218,8 @@ public function register(Request $request)
 
         $user = auth()->user();
         
-        if ($request->has('name')) {
-            $user->name = $request->name;
+        if ($request->has('nom')) {
+            $user->nom = $request->nom;
         }
         if ($request->has('email')) {
             $user->email = $request->email;
@@ -224,7 +231,7 @@ public function register(Request $request)
         $user->save();
 
         return response()->json([
-            'message' => 'Profile successfully updated',
+            'message' => 'Profil mis à jour avec succès',
             'user' => $user
         ]);
     }
@@ -236,7 +243,7 @@ public function register(Request $request)
         $user->delete();
 
         return response()->json([
-            'message' => 'User successfully deleted'
+            'message' => 'Utilisateur supprimé avec succès'
         ]);
     }
 }

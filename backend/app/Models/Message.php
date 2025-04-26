@@ -1,16 +1,23 @@
 <?php
-
 // app/Models/Message.php
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Message extends Model
 {
-    protected $fillable = ['contenu', 'dateEnvoi', 'discussion_id', 'user_id'];
+    use HasFactory;
+
+    protected $fillable = [
+        'contenu',
+        'dateEnvoi',
+        'discussion_id',
+        'user_id'
+    ];
 
     protected $casts = [
-        'dateEnvoi' => 'datetime',
+        'dateEnvoi' => 'datetime'
     ];
 
     public function discussion()
@@ -23,4 +30,3 @@ class Message extends Model
         return $this->belongsTo(User::class);
     }
 }
-

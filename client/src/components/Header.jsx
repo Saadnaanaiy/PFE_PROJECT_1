@@ -87,7 +87,7 @@ const Header = () => {
                       <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
                         <FiUser className="w-4 h-4 text-primary" />
                       </div>
-                      <span className="font-medium">{user?.nom?.split(' ')[0] || 'User'}</span>
+                      <span className="font-medium">{user?.nom || 'User'}</span>
                     </button>
                     
                     {isProfileMenuOpen && (

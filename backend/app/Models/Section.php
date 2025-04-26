@@ -1,13 +1,19 @@
 <?php
-
 // app/Models/Section.php
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Section extends Model
 {
-    protected $fillable = ['titre', 'ordre', 'cours_id'];
+    use HasFactory;
+
+    protected $fillable = [
+        'titre',
+        'ordre',
+        'cours_id'
+    ];
 
     public function cours()
     {
@@ -16,6 +22,6 @@ class Section extends Model
 
     public function lecons()
     {
-        return $this->hasMany(Lecon::class)->orderBy('ordre');
+        return $this->hasMany(Lecon::class);
     }
 }

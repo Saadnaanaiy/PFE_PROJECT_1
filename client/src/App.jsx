@@ -19,7 +19,7 @@ import CourseVideoView from './components/CourseVideoView';
 import Profile from './pages/Profile';
 import ProtectedRoute from './components/ProtectedRoute';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import InstructorDashboard from './pages/InstructorDashboard';
+
 
 // Define InstructorRoute outside of App component
 const InstructorRoute = ({ children }) => {
@@ -125,14 +125,7 @@ function App() {
             />
             
             {/* Instructor Specific Routes */}
-            <Route 
-              path="/instructor/dashboard" 
-              element={
-                <InstructorRoute>
-                  <InstructorDashboard />
-                </InstructorRoute>
-              } 
-            />
+            {/*  */}
             {/* Add more instructor routes here (e.g., create/edit course) */}
             {/* 
             <Route 
