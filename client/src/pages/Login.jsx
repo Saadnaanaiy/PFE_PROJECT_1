@@ -1,16 +1,35 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { FiMail, FiLock } from 'react-icons/fi';
 import morocademyIcon from '../assets/morocademy.ico';
+import { useAuth } from '../contexts/AuthContext';
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { login, error: authError } = useAuth();
+  
+  // Get the page user was trying to access before being redirected to login
+  const from = location.state?.from?.pathname || '/profile';
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // Handle login logic here
+    setIsLoading(true);
+    
+    try {
+      await login(email, password, rememberMe);
+      navigate(from);
+    } catch (err) {
+      // Error is handled by the AuthContext
+      console.error('Login error:', err);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -41,6 +60,12 @@ const Login = () => {
               </p>
             </div>
 
+            {authError && (
+              <div className="bg-red-50 text-red-700 p-3 rounded-md mb-6 text-sm">
+                {authError}
+              </div>
+            )}
+
             <form onSubmit={handleSubmit} className="space-y-6">
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-2">
@@ -54,6 +79,7 @@ const Login = () => {
                     className="w-full pl-10 pr-4 py-3 rounded-md border border-neutral-300 focus:ring-2 focus:ring-primary focus:border-transparent"
                     placeholder="Enter your email"
                     required
+                    disabled={isLoading}
                   />
                   <FiMail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-neutral-400" />
                 </div>
@@ -71,6 +97,7 @@ const Login = () => {
                     className="w-full pl-10 pr-4 py-3 rounded-md border border-neutral-300 focus:ring-2 focus:ring-primary focus:border-transparent"
                     placeholder="Enter your password"
                     required
+                    disabled={isLoading}
                   />
                   <FiLock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-neutral-400" />
                 </div>
@@ -81,7 +108,10 @@ const Login = () => {
                   <input
                     type="checkbox"
                     id="remember"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
                     className="h-4 w-4 text-primary focus:ring-primary border-neutral-300 rounded"
+                    disabled={isLoading}
                   />
                   <label
                     htmlFor="remember"
@@ -98,35 +128,13 @@ const Login = () => {
                 </Link>
               </div>
 
-              <button type="submit" className="btn-primary w-full py-3">
-                Sign In
+              <button 
+                type="submit" 
+                className={`btn-primary w-full py-3 ${isLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
+                disabled={isLoading}
+              >
+                {isLoading ? 'Signing in...' : 'Sign In'}
               </button>
-
-              <div className="relative my-6">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-neutral-300"></div>
-                </div>
-                <div className="relative flex justify-center text-sm">
-                  <span className="px-2 bg-white text-neutral-500">
-                    Or continue with
-                  </span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <button
-                  type="button"
-                  className="btn w-full border border-neutral-300 hover:bg-neutral-50"
-                >
-                  Google
-                </button>
-                <button
-                  type="button"
-                  className="btn w-full border border-neutral-300 hover:bg-neutral-50"
-                >
-                  Facebook
-                </button>
-              </div>
 
               <p className="text-center text-sm text-neutral-600 mt-6">
                 Don&apos;t have an account?{' '}

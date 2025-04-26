@@ -48,3 +48,4 @@ The Laravel backend should:
 - `/src/services/api.js` - Base API setup for communicating with Laravel
 - `/src/services/authService.js` - Authentication service for Laravel Sanctum
 - `/src/components/LoginForm.jsx` - Example login form component
+# ccc
