@@ -24,6 +24,13 @@ class InstructorCourseController extends Controller
 
         $cours = $instructeur->cours()->with('categorie')->get();
 
+        $cours->transform(function ($course) {
+            if ($course->image) {
+                $course->image = asset('storage/' . $course->image);
+            }
+            return $course;
+        });
+        
         return response()->json([
             'courses' => $cours
         ]);

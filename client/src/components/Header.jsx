@@ -1,14 +1,16 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { FiSearch, FiShoppingCart, FiMenu, FiX, FiUser, FiLogOut } from 'react-icons/fi';
+// Import graduation cap icon from another icon set that has this icon
+import { FaGraduationCap } from 'react-icons/fa';
 import Logo from './Logo';
-import { useAuth } from '../contexts/AuthContext'; // Make sure useAuth is imported
+import { useAuth } from '../contexts/AuthContext';
 
 const Header = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
-  const { user, isAuthenticated, logout, isInstructor } = useAuth(); // Add isInstructor
+  const { user, isAuthenticated, logout, isInstructor } = useAuth();
   const navigate = useNavigate();
 
   // Handle scroll effect
@@ -21,6 +23,15 @@ const Header = () => {
   const handleLogout = async () => {
     await logout();
     navigate('/');
+  };
+
+  // Get the appropriate icon based on user role
+  const getUserRoleIcon = () => {
+    if (isInstructor()) {
+      return <FaGraduationCap className="w-4 h-4 text-primary" />; // Graduation cap for instructors
+    } else {
+      return <FiUser className="w-4 h-4 text-primary" />; // Default user icon for students
+    }
   };
 
   return (
@@ -85,13 +96,26 @@ const Header = () => {
                       className="flex items-center space-x-2 text-neutral-800 hover:text-primary"
                     >
                       <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
-                        <FiUser className="w-4 h-4 text-primary" />
+                        {getUserRoleIcon()}
                       </div>
                       <span className="font-medium">{user?.nom || 'User'}</span>
                     </button>
                     
                     {isProfileMenuOpen && (
                       <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10">
+                        <div className="px-4 py-2 border-b border-neutral-200">
+                          <div className="flex items-center">
+                            <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center mr-2">
+                              {getUserRoleIcon()}
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium">{user?.nom || 'User'}</p>
+                              <p className="text-xs text-neutral-500">
+                                {isInstructor() ? 'Instructor' : 'Student'}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
                         <Link 
                           to="/profile" 
                           className="block px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-100"
@@ -163,6 +187,21 @@ const Header = () => {
         {/* Mobile Navigation */}
         {isOpen && (
           <div className="md:hidden mt-4 animate-fadeIn">
+            {isAuthenticated() && (
+              <div className="px-4 py-3 border-b border-neutral-200 mb-4">
+                <div className="flex items-center">
+                  <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center mr-2">
+                    {getUserRoleIcon()}
+                  </div>
+                  <div>
+                    <p className="font-medium">{user?.nom || 'User'}</p>
+                    <p className="text-xs text-neutral-500">
+                      {isInstructor() ? 'Instructor' : 'Student'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
             <div className="relative mb-4">
               <input
                 type="text"
@@ -172,8 +211,20 @@ const Header = () => {
               <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-neutral-500" />
             </div>
             <div className="flex flex-col space-y-4 pb-4">
-              <Link /* Categories */ onClick={() => setIsOpen(false)} > Categories </Link>
-              <Link /* Courses */ onClick={() => setIsOpen(false)} > Courses </Link>
+              <Link 
+                to="/categories"
+                className="text-neutral-800 hover:text-primary font-medium px-1 py-2 border-b border-neutral-200"
+                onClick={() => setIsOpen(false)}
+              >
+                Categories
+              </Link>
+              <Link 
+                to="/courses"
+                className="text-neutral-800 hover:text-primary font-medium px-1 py-2 border-b border-neutral-200"
+                onClick={() => setIsOpen(false)}
+              >
+                Courses
+              </Link>
               {/* Conditional Mobile Link */}
               {isAuthenticated() && isInstructor() ? (
                 <Link

@@ -11,25 +11,29 @@ export const AuthProvider = ({ children }) => {
   // Check if user is authenticated on initial load
   useEffect(() => {
     const checkAuthStatus = async () => {
-      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-      
+      const token =
+        localStorage.getItem('token') || sessionStorage.getItem('token');
+
       if (token) {
         try {
           // Set the authorization header
           axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-          
+
           // Fetch user data
-          const response = await axios.get('http://localhost:8000/api/users');
+          const response = await axios.get('http://localhost:8000/api/user');
           setUser(response.data);
         } catch (err) {
           console.error('Authentication check failed:', err);
           // Clear invalid tokens
           localStorage.removeItem('token');
           sessionStorage.removeItem('token');
+          delete axios.defaults.headers.common['Authorization'];
           setUser(null);
         }
+      } else {
+        setUser(null);
       }
-      
+
       setLoading(false);
     };
 
@@ -42,25 +46,27 @@ export const AuthProvider = ({ children }) => {
     try {
       const response = await axios.post('http://localhost:8000/api/login', {
         email,
-        password
+        password,
       });
-      
+
       // Store token in localStorage or sessionStorage based on "remember me"
       const storage = rememberMe ? localStorage : sessionStorage;
       storage.setItem('token', response.data.access_token);
       storage.setItem('token_type', response.data.token_type);
-      
+
       // Set authorization header for future requests
-      axios.defaults.headers.common['Authorization'] = 
-        `${response.data.token_type} ${response.data.access_token}`;
-      
+      axios.defaults.headers.common[
+        'Authorization'
+      ] = `${response.data.token_type} ${response.data.access_token}`;
+
       // Fetch user data
       const userResponse = await axios.get('http://localhost:8000/api/user');
       setUser(userResponse.data);
-      
+
       return response.data;
     } catch (err) {
-      const errorMessage = err.response?.data?.message || 'Login failed. Please try again.';
+      const errorMessage =
+        err.response?.data?.message || 'Login failed. Please try again.';
       setError(errorMessage);
       throw new Error(errorMessage);
     }
@@ -70,10 +76,14 @@ export const AuthProvider = ({ children }) => {
   const register = async (userData) => {
     setError(null);
     try {
-      const response = await axios.post('http://localhost:8000/api/register', userData);
+      const response = await axios.post(
+        'http://localhost:8000/api/register',
+        userData,
+      );
       return response.data;
     } catch (err) {
-      const errorMessage = err.response?.data?.message || 'Registration failed. Please try again.';
+      const errorMessage =
+        err.response?.data?.message || 'Registration failed. Please try again.';
       setError(errorMessage);
       throw new Error(errorMessage);
     }
@@ -113,9 +123,9 @@ export const AuthProvider = ({ children }) => {
     return user?.role === 'etudiant' || (!isAdmin() && !isInstructor());
   };
 
-
   const value = {
     user,
+    setUser,
     loading,
     error,
     login,
@@ -124,7 +134,7 @@ export const AuthProvider = ({ children }) => {
     isAuthenticated,
     isAdmin,
     isInstructor,
-    isStudent
+    isStudent,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

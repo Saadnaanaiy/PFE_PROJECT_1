@@ -1,25 +1,33 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { FiSearch, FiPlus } from 'react-icons/fi';
+import { FiSearch, FiPlus, FiFilter, FiTag } from 'react-icons/fi';
 import moroccanPattern from '../assets/moroccan-pattern.svg';
 import axios from 'axios';
 
 const InstructorCoursesList = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [courses, setCourses] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [showCategoryFilter, setShowCategoryFilter] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
-    const fetchCourses = async () => {
+    const fetchData = async () => {
       try {
         setLoading(true);
-        const response = await axios.get('/api/instructor/courses');
         
-        // Transform the data to match our component structure
-        const formattedCourses = response.data.courses.map(course => ({
+        // Fetch courses and categories in parallel
+        const [coursesResponse, categoriesResponse] = await Promise.all([
+          axios.get('/api/instructor/courses'),
+          axios.get('/api/instructor/categories')
+        ]);
+        
+        // Transform courses data
+        const formattedCourses = coursesResponse.data.courses.map(course => ({
           id: course.id,
           title: course.titre,
           description: course.description,
@@ -27,7 +35,7 @@ const InstructorCoursesList = () => {
           level: course.niveau,
           category: course.categorie?.nom || 'Uncategorized',
           categoryId: course.categorie_id,
-          image: course.image ? `/storage/${course.image}` : '/default-course.jpg',
+          image: course.image ? `${course.image}` : '/default-course.jpg',
           duration: course.dureeMinutes,
           progress: course.progress,
           students: course.etudiants_count || 0,
@@ -35,16 +43,17 @@ const InstructorCoursesList = () => {
         }));
         
         setCourses(formattedCourses);
+        setCategories(categoriesResponse.data.categories);
         setError(null);
       } catch (err) {
-        console.error('Error fetching courses:', err);
-        setError('Failed to load courses. Please try again later.');
+        console.error('Error fetching data:', err);
+        setError('Failed to load data. Please try again later.');
       } finally {
         setLoading(false);
       }
     };
 
-    fetchCourses();
+    fetchData();
   }, []);
 
   // Function to handle navigation to course edit page
@@ -56,13 +65,33 @@ const InstructorCoursesList = () => {
   const handleCreateCourse = () => {
     navigate('/instructor/courses/create');
   };
+  
+  // Function to view category details
+  const handleCategoryClick = (categoryId) => {
+    navigate(`/instructor/categories/${categoryId}`);
+  };
 
-  // Filter courses based on search term
-  const filteredCourses = courses.filter(
-    (course) =>
-      course.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      course.category.toLowerCase().includes(searchTerm.toLowerCase()),
-  );
+  // Toggle category filter dropdown
+  const toggleCategoryFilter = () => {
+    setShowCategoryFilter(!showCategoryFilter);
+  };
+
+  // Function to filter courses based on search term and selected category
+  const getFilteredCourses = () => {
+    return courses.filter(
+      (course) => {
+        const matchSearch = course.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            course.category.toLowerCase().includes(searchTerm.toLowerCase());
+        
+        const matchCategory = selectedCategory === '' || 
+                             course.categoryId === parseInt(selectedCategory, 10);
+        
+        return matchSearch && matchCategory;
+      }
+    );
+  };
+
+  const filteredCourses = getFilteredCourses();
 
   // Featured courses (top 4 based on students)
   const featuredCourses = [...courses]
@@ -97,7 +126,25 @@ const InstructorCoursesList = () => {
           </p>
         </motion.div>
 
-        {/* Search and Add Course */}
+        {/* Tabs for Courses and Categories */}
+        <div className="mb-8 flex justify-center">
+          <div className="inline-flex rounded-lg border border-neutral-200 bg-white shadow-sm">
+            <Link 
+              to="/instructor/courses" 
+              className="px-6 py-3 font-medium text-primary border-b-2 border-primary rounded-l-lg"
+            >
+              Courses
+            </Link>
+            <Link 
+              to="/instructor/categories" 
+              className="px-6 py-3 font-medium text-neutral-600 hover:text-primary rounded-r-lg"
+            >
+              Categories
+            </Link>
+          </div>
+        </div>
+
+        {/* Search, Filter, and Add Course */}
         <div className="mb-12 flex flex-col md:flex-row gap-4">
           <div className="relative flex-grow">
             <input
@@ -109,6 +156,52 @@ const InstructorCoursesList = () => {
             />
             <FiSearch className="absolute left-4 top-1/2 transform -translate-y-1/2 text-neutral-400 text-xl" />
           </div>
+          
+          {/* Category Filter */}
+          <div className="relative">
+            <button
+              onClick={toggleCategoryFilter}
+              className="btn-secondary flex items-center justify-center gap-2 px-6 py-4 rounded-xl shadow-sm"
+            >
+              <FiFilter className="text-lg" />
+              Filter
+            </button>
+            
+            {showCategoryFilter && (
+              <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg z-50 border border-neutral-200">
+                <div className="p-4">
+                  <h4 className="font-medium mb-2">Filter by Category</h4>
+                  <select
+                    value={selectedCategory}
+                    onChange={(e) => setSelectedCategory(e.target.value)}
+                    className="w-full p-2 border border-neutral-300 rounded-lg mb-3"
+                  >
+                    <option value="">All Categories</option>
+                    {categories.map((category) => (
+                      <option key={category.id} value={category.id}>
+                        {category.nom}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="flex justify-between">
+                    <button
+                      onClick={() => setSelectedCategory('')}
+                      className="text-neutral-600 text-sm hover:text-primary"
+                    >
+                      Clear Filter
+                    </button>
+                    <button
+                      onClick={toggleCategoryFilter}
+                      className="text-primary text-sm font-medium"
+                    >
+                      Apply
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+          
           <button
             onClick={handleCreateCourse}
             className="btn-primary flex items-center justify-center gap-2 px-6 py-4 whitespace-nowrap rounded-xl shadow-sm"
@@ -137,6 +230,50 @@ const InstructorCoursesList = () => {
           </div>
         ) : (
           <>
+            {/* Categories Section */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.1 }}
+              className="mb-16"
+            >
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-heading font-bold">Categories</h2>
+                {/* "Add Category" button removed as requested */}
+              </div>
+              
+              {categories.length > 0 ? (
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {categories.map((category) => (
+                    <div
+                      key={category.id}
+                      className="bg-white p-6 rounded-xl shadow-card hover:shadow-lg transition-all cursor-pointer flex flex-col items-center text-center group"
+                    >
+                      <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-3">
+                        <FiTag className="text-primary text-xl" />
+                      </div>
+                      <h3 className="font-heading font-semibold mb-1 group-hover:text-primary transition-colors">
+                        {category.nom}
+                      </h3>
+                      <p className="text-sm text-neutral-500 line-clamp-2">
+                        {category.description || 'No description'}
+                      </p>
+                      <div className="mt-2 text-xs text-primary font-medium">
+                        {courses.filter(course => course.categoryId === category.id).length} Courses
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 bg-white rounded-xl shadow-card">
+                  <h3 className="text-lg font-medium mb-2">No categories found</h3>
+                  <p className="text-neutral-600 mb-4">
+                    No categories are available for your courses
+                  </p>
+                </div>
+              )}
+            </motion.div>
+            
             {/* Featured Courses */}
             {featuredCourses.length > 0 && (
               <motion.div
@@ -265,10 +402,13 @@ const InstructorCoursesList = () => {
                     Try adjusting your search terms or create a new course
                   </p>
                   <button
-                    onClick={() => setSearchTerm('')}
+                    onClick={() => {
+                      setSearchTerm('');
+                      setSelectedCategory('');
+                    }}
                     className="btn-secondary px-6 py-2 mr-4"
                   >
-                    Clear Search
+                    Clear Filters
                   </button>
                   <button
                     onClick={handleCreateCourse}

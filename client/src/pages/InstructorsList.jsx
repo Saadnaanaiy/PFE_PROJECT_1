@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { FiSearch } from 'react-icons/fi';
 import moroccanPattern from '../assets/moroccan-pattern.svg';
-import axios from 'axios'; // You'll need to install axios if not already done
+import axios from 'axios';
 
 const InstructorsList = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -17,16 +17,23 @@ const InstructorsList = () => {
       try {
         setLoading(true);
         const response = await axios.get('/api/instructors');
+        console.log(response.data);
         
         // Transform the data to match our component structure
-        const formattedInstructors = response.data.instructors.map(user => ({
+        // Handling the actual structure from the API response
+        const instructorsData = response.data.instructors || [];
+        const formattedInstructors = instructorsData.map(user => ({
           id: user.id,
           name: user.nom,
-          specialty: user.instructeur.specialite,
-          courses: user.instructeur.courses_count || 0,
-          students: user.instructeur.students_count || 0,
-          image: user.image ? `/storage/${user.image}` : '/default-profile.jpg',
-          bio: user.instructeur.bio,
+          specialty: user.instructeur?.specialite || "Not specified",
+          courses: user.instructeur?.courses_count || 0,
+          students: user.instructeur?.students_count || 0,
+          image: user.instructeur?.image 
+            ? `${user.instructeur.image}` 
+            : user.image 
+              ? `${user.image}` 
+              : '/default-profile.jpg',
+          bio: user.instructeur?.bio || "No bio available",
         }));
         
         setInstructors(formattedInstructors);

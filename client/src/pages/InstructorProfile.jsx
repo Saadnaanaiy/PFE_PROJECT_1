@@ -28,7 +28,7 @@ const InstructorProfile = () => {
           id: instructorResponse.data.id,
           name: instructorResponse.data.nom,
           specialty: instructorResponse.data.instructeur.specialite,
-          image: instructorResponse.data.image ? `/storage/${instructorResponse.data.image}` : '/default-profile.jpg',
+          image: instructorResponse.data.instructeur.image ? `${instructorResponse.data.instructeur.image}` : '/default-profile.jpg',
           bio: instructorResponse.data.instructeur.bio,
           fullBio: instructorResponse.data.instructeur.bio, // Use same bio for full bio if not provided
           courses: instructorResponse.data.instructeur.courses_count || 0,

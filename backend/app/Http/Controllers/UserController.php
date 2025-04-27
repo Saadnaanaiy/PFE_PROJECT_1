@@ -15,69 +15,94 @@ use Illuminate\Support\Facades\Gate;
 class UserController extends Controller
 {
     public function register(Request $request)
-    {
-        // Validation de la requête
-        $request->validate([
-            'nom' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users',
-            'password' => 'required|string|min:6|confirmed',
-            'role' => 'required|string|in:etudiant,instructeur,administrateur', // Modifié pour les rôles en français
-            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:10048',
-            'bio' => 'required_if:role,instructeur|string|max:500', // Modifié pour les rôles en français
-            'specialite' => 'required_if:role,instructeur|string|max:255', // Modifié pour les rôles en français
+{
+    // Validation de la requête
+    $request->validate([
+        'nom' => 'required|string|max:255',
+        'email' => 'required|string|email|max:255|unique:users',
+        'password' => 'required|string|min:6|confirmed',
+        'role' => 'required|string|in:etudiant,instructeur,administrateur',
+        'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:10048',
+        'bio' => 'required_if:role,instructeur|string|max:500',
+        'specialite' => 'required_if:role,instructeur|string|max:255',
+    ]);
+
+    // Démarrer une transaction de base de données
+    DB::beginTransaction();
+
+    try {
+        $imagePath = null;
+        if ($request->hasFile('image')) {
+            // Store the image in a more organized way
+            // Use a role-specific subfolder for better organization
+            $folder = $request->role . 's'; // Creates 'etudiants', 'instructeurs', etc.
+            $imagePath = $request->file('image')->store($folder, 'public');
+        }
+
+        // Créer l'utilisateur
+        $user = User::create([
+            'nom' => $request->nom,
+            'email' => $request->email,
+            'password' => Hash::make($request->password),
+            'role' => $request->role,
+            // Don't store the image path in the users table if you're also storing it in role-specific tables
+            // This prevents duplication and inconsistency
+            // 'image' => $imagePath,
         ]);
 
-        // Démarrer une transaction de base de données
-        DB::beginTransaction();
-
-        try {
-            $imagePath = null;
-            if ($request->hasFile('image')) {
-                $imagePath = $request->file('image')->store('images', 'public');
-            }
-            // Créer l'utilisateur
-            $user = User::create([
-                'nom' => $request->nom,
-                'email' => $request->email,
-                'password' => Hash::make($request->password),
-                'role' => $request->role,
+        // En fonction du rôle, créer l'enregistrement correspondant
+        if ($request->role === 'etudiant') {
+            // Créer l'enregistrement étudiant
+            Etudiant::create([
+                'user_id' => $user->id,
+                'image' => $imagePath,
+                // Ajouter d'autres champs spécifiques aux étudiants si nécessaire
+            ]);
+        } else if ($request->role === 'instructeur') {
+            // Créer l'enregistrement instructeur
+            Instructeur::create([
+                'user_id' => $user->id,
+                'bio' => $request->bio,
+                'specialite' => $request->specialite,
                 'image' => $imagePath,
             ]);
-
-            // En fonction du rôle, créer l'enregistrement correspondant
-            if ($request->role === 'etudiant') {
-                // Créer l'enregistrement étudiant
-                Etudiant::create([
-                    'user_id' => $user->id,
-                    'image' => $imagePath,
-                    // Ajouter d'autres champs spécifiques aux étudiants si nécessaire
-                ]);
-            } else if ($request->role === 'instructeur') {
-                // Créer l'enregistrement instructeur
-                Instructeur::create([
-                    'user_id' => $user->id,
-                    'bio' => $request->bio,
-                    'specialite' => $request->specialite,
-                    'image' => $imagePath,
-                ]);
-            }
-
-            // Valider la transaction
-            DB::commit();
-
-            return response()->json([
-                'message' => 'Utilisateur enregistré avec succès',
-                'user' => $user
-            ], 201);
-        } catch (\Exception $e) {
-            // Annuler la transaction en cas d'échec
-            DB::rollBack();
-            return response()->json([
-                'message' => 'Échec de l\'enregistrement',
-                'error' => $e->getMessage()
-            ], 500);
         }
+
+        // Valider la transaction
+        DB::commit();
+
+        // Transform user data for response to include full image URL
+        $responseUser = $user->toArray();
+
+        // Add role-specific data to response
+        if ($request->role === 'etudiant') {
+            $etudiant = Etudiant::where('user_id', $user->id)->first();
+            $responseUser['etudiant'] = $etudiant;
+            if ($etudiant && $etudiant->image) {
+                $responseUser['etudiant']['image'] = asset('storage/' . $etudiant->image);
+            }
+        } else if ($request->role === 'instructeur') {
+            $instructeur = Instructeur::where('user_id', $user->id)->first();
+            $responseUser['instructeur'] = $instructeur;
+            if ($instructeur && $instructeur->image) {
+                $responseUser['instructeur']['image'] = asset('storage/' . $instructeur->image);
+            }
+        }
+
+        return response()->json([
+            'message' => 'Utilisateur enregistré avec succès',
+            'user' => $responseUser
+        ], 201);
+    } catch (\Exception $e) {
+        // Annuler la transaction en cas d'échec
+        DB::rollBack();
+
+        return response()->json([
+            'message' => 'Échec de l\'enregistrement',
+            'error' => $e->getMessage()
+        ], 500);
     }
+}
 
     public function login(Request $request)
     {
@@ -109,7 +134,7 @@ class UserController extends Controller
     public function logout()
     {
         auth()->user()->tokens()->delete();
-        
+
         return response()->json([
             'message' => 'Déconnexion réussie'
         ]);
@@ -123,7 +148,7 @@ class UserController extends Controller
     public function updateProfile(Request $request)
     {
         $user = auth()->user();
-        
+
         $validator = Validator::make($request->all(), [
             'nom' => 'string|max:255',
             'email' => 'string|email|max:255|unique:users,email,' . $user->id,
@@ -137,15 +162,15 @@ class UserController extends Controller
         if ($request->has('nom')) {
             $user->nom = $request->nom;
         }
-        
+
         if ($request->has('email')) {
             $user->email = $request->email;
         }
-        
+
         if ($request->filled('password')) {
             $user->password = Hash::make($request->password);
         }
-        
+
         $user->save();
 
         return response()->json([
@@ -164,11 +189,11 @@ class UserController extends Controller
         // if (!Gate::allows('view-users')) {
         //     return response()->json(['message' => 'Interdit'], 403);
         // }
-        
+
         $users = User::where('role', 'instructeur')
                     ->with('instructeur')
                     ->get();
-                    
+
         return response()->json(['instructeurs' => $users]);
     }
 
@@ -183,27 +208,36 @@ public function getInstructors()
     // Get instructors with related data
     $instructors = User::where('role', 'instructeur')
         ->with(['instructeur' => function($query) {
-            $query->select('id', 'user_id', 'bio', 'specialite');
+            $query->select('id', 'user_id', 'bio', 'specialite', 'image');
             // Add this to count courses if you have a courses relationship
             // $query->withCount('courses');
             // Add this to count students if you have a students relationship
             // $query->withCount('students');
         }])
         ->get();
-    
-    // Add course and student counts if not available through relationships
-    $instructors->each(function ($instructor) {
+
+    // Transform the instructors collection
+    $instructors->transform(function ($instructor) {
+        // Add course and student counts if not available through relationships
         if (!isset($instructor->instructeur->courses_count)) {
-            // If you don't have a courses relationship, you can set a default or get from somewhere else
             $instructor->instructeur->courses_count = rand(1, 15); // Temporary replacement for demo
         }
-        
+
         if (!isset($instructor->instructeur->students_count)) {
-            // If you don't have a students relationship, you can set a default or get from somewhere else
             $instructor->instructeur->students_count = rand(500, 5000); // Temporary replacement for demo
         }
+
+        // Transform the image URL if exists
+        if (isset($instructor->instructeur->image)) {
+            $instructor->instructeur->image = asset('storage/' . $instructor->instructeur->image);
+        } else {
+            // Provide a default image URL
+            $instructor->instructeur->image = asset('img/default-instructor.jpg');
+        }
+
+        return $instructor;
     });
-    
+
     return response()->json(['instructors' => $instructors]);
 }
 
@@ -214,46 +248,47 @@ public function getInstructors()
     public function show($id)
 {
     $user = User::where('id', $id)
-        ->where('role', 'instructeur')
         ->with(['instructeur' => function($query) {
-            $query->select('id', 'user_id', 'bio', 'specialite');
+            $query->select('id', 'user_id', 'bio', 'specialite', 'image');
+        }, 'etudiant' => function($query) {
+            $query->select('id', 'user_id', 'image');
         }])
         ->first();
-        
+
     if (!$user) {
-        return response()->json(['message' => 'Instructeur non trouvé'], 404);
+        return response()->json(['message' => 'Utilisateur non trouvé'], 404);
     }
-    
-    // Add course and student counts if not available through relationships
-    if (!isset($user->instructeur->courses_count)) {
-        // If you have a courses table with instructor_id field, you could count:
-        // $user->instructeur->courses_count = Course::where('instructor_id', $user->instructeur->id)->count();
-        $user->instructeur->courses_count = rand(1, 15); // Temporary replacement for demo
+
+    if ($user->role === 'instructeur') {
+        // Add course and student counts if not available through relationships
+        if (!isset($user->instructeur->courses_count)) {
+            // If you have a courses table with instructor_id field, you could count:
+            // $user->instructeur->courses_count = Course::where('instructor_id', $user->instructeur->id)->count();
+            $user->instructeur->courses_count = rand(1, 15); // Temporary replacement for demo
+        }
+
+        if (!isset($user->instructeur->students_count)) {
+            // You could calculate this from enrollments if you have the tables
+            $user->instructeur->students_count = rand(500, 5000); // Temporary replacement for demo
+        }
+
+        // Transform the image URL if exists
+        if ($user->instructeur && $user->instructeur->image) {
+            $user->instructeur->image = asset('storage/' . $user->instructeur->image);
+        } else {
+            // Provide a default image URL
+            $user->instructeur->image = asset('img/default-instructor.jpg');
+        }
+    } else if ($user->role === 'etudiant') {
+        // Transform the image URL for student if exists
+        if ($user->etudiant && $user->etudiant->image) {
+            $user->etudiant->image = asset('storage/' . $user->etudiant->image);
+        } else {
+            // Provide a default image URL for student
+            $user->etudiant->image = asset('img/default-student.jpg');
+        }
     }
-    
-    if (!isset($user->instructeur->students_count)) {
-        // You could calculate this from enrollments if you have the tables
-        $user->instructeur->students_count = rand(500, 5000); // Temporary replacement for demo
-    }
-    
-    // Add credentials if available (from a related table or as a JSON field)
-    $user->instructeur->credentials = [
-        [
-            'title' => 'Diplôme Universitaire',
-            'institution' => 'Université de Casablanca'
-        ],
-        [
-            'title' => 'Certification Professionnelle',
-            'institution' => 'Institut de Formation'
-        ]
-    ];
-    
-    // Add social links if available
-    $user->instructeur->social_links = [
-        'website' => 'https://example.com',
-        'linkedin' => 'https://linkedin.com/in/example'
-    ];
-    
+
     return response()->json($user);
 }
 
@@ -270,7 +305,7 @@ public function getInstructors()
         }
 
         $user = auth()->user();
-        
+
         if ($request->has('nom')) {
             $user->nom = $request->nom;
         }
@@ -280,7 +315,7 @@ public function getInstructors()
         if ($request->has('password')) {
             $user->password = Hash::make($request->password);
         }
-        
+
         $user->save();
 
         return response()->json([
