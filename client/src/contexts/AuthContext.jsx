@@ -122,7 +122,6 @@ export const AuthProvider = ({ children }) => {
     register,
     logout,
     isAuthenticated,
-    // Add role checkers to context value
     isAdmin,
     isInstructor,
     isStudent

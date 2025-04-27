@@ -14,7 +14,8 @@ class Cours extends Model
         'description',
         'prix',
         'niveau',
-        'estPublic',
+        'image',
+        'progress',
         'dateCreation',
         'dureeMinutes',
         'instructeur_id',
@@ -22,7 +23,6 @@ class Cours extends Model
     ];
 
     protected $casts = [
-        'estPublic' => 'boolean',
         'dateCreation' => 'datetime',
         'prix' => 'float'
     ];

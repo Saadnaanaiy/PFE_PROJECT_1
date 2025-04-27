@@ -14,9 +14,10 @@ return new class extends Migration
             $table->text('description');
             $table->float('prix')->default(0);
             $table->string('niveau');
-            $table->boolean('estPublic')->default(false);
+            $table->string('image')->nullable();
             $table->timestamp('dateCreation')->useCurrent();
             $table->integer('dureeMinutes')->default(0);
+            $table->integer('progress')->default(0); // Added progress field
             $table->foreignId('instructeur_id')->constrained()->onDelete('cascade');
             $table->foreignId('categorie_id')->nullable()->constrained()->onDelete('set null');
             $table->timestamps();

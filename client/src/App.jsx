@@ -19,6 +19,8 @@ import CourseVideoView from './components/CourseVideoView';
 import Profile from './pages/Profile';
 import ProtectedRoute from './components/ProtectedRoute';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import InstructorCoursesList from './pages/InstructorCoursesList';
+import CreateCourse from './pages/CreateCourse';
 
 
 // Define InstructorRoute outside of App component
@@ -123,20 +125,26 @@ function App() {
                 </ProtectedRoute>
               } 
             />
-            
-            {/* Instructor Specific Routes */}
-            {/*  */}
-            {/* Add more instructor routes here (e.g., create/edit course) */}
-            {/* 
-            <Route 
-              path="/instructor/courses/new" 
-              element={<InstructorRoute><CreateCoursePage /></InstructorRoute>} 
+
+<Route 
+              path="/instructor/dashboard" 
+              element={
+                <ProtectedRoute>
+                  <InstructorCoursesList />
+                </ProtectedRoute>
+              } 
             />
-            <Route 
-              path="/instructor/courses/:courseId/edit" 
-              element={<InstructorRoute><EditCoursePage /></InstructorRoute>} 
-            /> 
-            */}
+
+<Route path="/instructor/courses/create" element={
+            <ProtectedRoute>
+              <CreateCourse />
+            </ProtectedRoute>
+          } />
+
+
+            
+            
+            
           </Routes>
         </main>
         {!isFullScreenRoute && <Footer />}

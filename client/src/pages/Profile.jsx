@@ -16,8 +16,8 @@ const Profile = () => {
     const fetchUsers = async () => {
       try {
         const response = await axios.get('http://localhost:8000/api/users');
-        setUsers(response.data.users);
-        console.log('Users:', response.data.users);
+        setUsers(response.data.instructeur);
+        console.log('Users:', response.data.instructeurs[0].instructeur);
         setLoading(false);
       } catch (error) {
         console.error('Error fetching users:', error);
@@ -50,6 +50,9 @@ const Profile = () => {
       }
     ]);
   }, []);
+
+  // Extract instructor data if user is an instructor
+  const instructorData = user?.role === 'instructeur' ? user.instructeur : null;
 
   return (
     <div className="min-h-screen bg-neutral-50 py-12">
@@ -176,6 +179,7 @@ const Profile = () => {
                         <tr>
                           <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Name</th>
                           <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Email</th>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Role</th>
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-neutral-200">
@@ -186,6 +190,9 @@ const Profile = () => {
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div className="text-sm text-neutral-600">{user.email}</div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm text-neutral-600 capitalize">{user.role}</div>
                             </td>
                           </tr>
                         ))}
@@ -207,17 +214,20 @@ const Profile = () => {
             <div className="bg-white rounded-xl shadow-card overflow-hidden">
               <div className="p-6 text-center">
                 <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
-                  {/* <FiUser className="w-8 h-8 text-primary" /> */}
-                  <img 
-                      src={user?.image} 
+                  {user?.image ? (
+                    <img 
+                      src={user.image} 
                       alt="Photo de profil" 
-                      className="w-full h-full object-cover"  
+                      className="w-full h-full rounded-full object-cover" 
                     />
+                  ) : (
+                    <FiUser className="w-8 h-8 text-primary" />
+                  )}
                 </div>
                 <h3 className="font-heading font-semibold mb-1">{user?.nom || 'Student'}</h3>
                 <p className="text-sm text-neutral-600 mb-4">{user?.email || 'No email available'}</p>
-                <div className="space-y-2">
                 
+                <div className="space-y-2">
                   <button onClick={logout} className="btn-outline w-full py-2 text-red-500 border-red-200 hover:bg-red-600">
                     Logout
                   </button>
