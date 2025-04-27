@@ -19,13 +19,13 @@ const InstructorCoursesList = () => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        
+
         // Fetch courses and categories in parallel
         const [coursesResponse, categoriesResponse] = await Promise.all([
           axios.get('/api/instructor/courses'),
           axios.get('/api/instructor/categories')
         ]);
-        
+
         // Transform courses data
         const formattedCourses = coursesResponse.data.courses.map(course => ({
           id: course.id,
@@ -41,7 +41,7 @@ const InstructorCoursesList = () => {
           students: course.etudiants_count || 0,
           createdAt: new Date(course.dateCreation),
         }));
-        
+
         setCourses(formattedCourses);
         setCategories(categoriesResponse.data.categories);
         setError(null);
@@ -65,7 +65,7 @@ const InstructorCoursesList = () => {
   const handleCreateCourse = () => {
     navigate('/instructor/courses/create');
   };
-  
+
   // Function to view category details
   const handleCategoryClick = (categoryId) => {
     navigate(`/instructor/categories/${categoryId}`);
@@ -82,10 +82,10 @@ const InstructorCoursesList = () => {
       (course) => {
         const matchSearch = course.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                             course.category.toLowerCase().includes(searchTerm.toLowerCase());
-        
-        const matchCategory = selectedCategory === '' || 
+
+        const matchCategory = selectedCategory === '' ||
                              course.categoryId === parseInt(selectedCategory, 10);
-        
+
         return matchSearch && matchCategory;
       }
     );
@@ -129,14 +129,14 @@ const InstructorCoursesList = () => {
         {/* Tabs for Courses and Categories */}
         <div className="mb-8 flex justify-center">
           <div className="inline-flex rounded-lg border border-neutral-200 bg-white shadow-sm">
-            <Link 
-              to="/instructor/courses" 
+            <Link
+              to="/instructor/courses"
               className="px-6 py-3 font-medium text-primary border-b-2 border-primary rounded-l-lg"
             >
               Courses
             </Link>
-            <Link 
-              to="/instructor/categories" 
+            <Link
+              to="/instructor/categories"
               className="px-6 py-3 font-medium text-neutral-600 hover:text-primary rounded-r-lg"
             >
               Categories
@@ -156,7 +156,7 @@ const InstructorCoursesList = () => {
             />
             <FiSearch className="absolute left-4 top-1/2 transform -translate-y-1/2 text-neutral-400 text-xl" />
           </div>
-          
+
           {/* Category Filter */}
           <div className="relative">
             <button
@@ -166,7 +166,7 @@ const InstructorCoursesList = () => {
               <FiFilter className="text-lg" />
               Filter
             </button>
-            
+
             {showCategoryFilter && (
               <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg z-50 border border-neutral-200">
                 <div className="p-4">
@@ -201,7 +201,7 @@ const InstructorCoursesList = () => {
               </div>
             )}
           </div>
-          
+
           <button
             onClick={handleCreateCourse}
             className="btn-primary flex items-center justify-center gap-2 px-6 py-4 whitespace-nowrap rounded-xl shadow-sm"
@@ -241,7 +241,7 @@ const InstructorCoursesList = () => {
                 <h2 className="text-2xl font-heading font-bold">Categories</h2>
                 {/* "Add Category" button removed as requested */}
               </div>
-              
+
               {categories.length > 0 ? (
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                   {categories.map((category) => (
@@ -273,7 +273,7 @@ const InstructorCoursesList = () => {
                 </div>
               )}
             </motion.div>
-            
+
             {/* Featured Courses */}
             {featuredCourses.length > 0 && (
               <motion.div
@@ -309,7 +309,7 @@ const InstructorCoursesList = () => {
                         <p className="text-primary text-sm mb-3">{course.category}</p>
                         <div className="mb-3">
                           <div className="w-full bg-neutral-200 rounded-full h-2">
-                            <div 
+                            <div
                               className="bg-primary h-2 rounded-full"
                               style={{ width: `${course.progress}%` }}
                             ></div>
@@ -345,7 +345,7 @@ const InstructorCoursesList = () => {
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.5, delay: 0.1 + index * 0.05 }}
                     >
-                      <div 
+                      <div
                         className="flex bg-white rounded-xl overflow-hidden shadow-card hover:shadow-lg transition-all group cursor-pointer"
                         onClick={() => handleCourseClick(course.id)}
                       >
@@ -371,7 +371,7 @@ const InstructorCoursesList = () => {
                           </p>
                           <div className="mb-2">
                             <div className="w-full bg-neutral-200 rounded-full h-1.5">
-                              <div 
+                              <div
                                 className="bg-primary h-1.5 rounded-full"
                                 style={{ width: `${course.progress}%` }}
                               ></div>
@@ -445,7 +445,7 @@ const InstructorCoursesList = () => {
               Share your knowledge and expertise with students worldwide.
               Our platform provides all the tools you need to create engaging and effective courses.
             </p>
-            <button 
+            <button
               onClick={handleCreateCourse}
               className="btn-primary px-8 py-3"
             >

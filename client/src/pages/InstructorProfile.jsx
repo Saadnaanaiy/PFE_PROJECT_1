@@ -19,58 +19,68 @@ const InstructorProfile = () => {
     const fetchInstructorData = async () => {
       try {
         setLoading(true);
-        
+
         // Fetch instructor details
-        const instructorResponse = await axios.get(`/api/instructors/${instructorId}`);
-        
+        const instructorResponse = await axios.get(
+          `/api/instructors/${instructorId}`,
+        );
+
         // Format instructor data
         const instructorData = {
           id: instructorResponse.data.id,
           name: instructorResponse.data.nom,
           specialty: instructorResponse.data.instructeur.specialite,
-          image: instructorResponse.data.instructeur.image ? `${instructorResponse.data.instructeur.image}` : '/default-profile.jpg',
+          image: instructorResponse.data.instructeur.image
+            ? `${instructorResponse.data.instructeur.image}`
+            : '/default-profile.jpg',
           bio: instructorResponse.data.instructeur.bio,
           fullBio: instructorResponse.data.instructeur.bio, // Use same bio for full bio if not provided
           courses: instructorResponse.data.instructeur.courses_count || 0,
-          students: instructorResponse.data.instructeur.students_count || 0
+          students: instructorResponse.data.instructeur.students_count || 0,
         };
-        
+
         setInstructor(instructorData);
-        
+
         // Fetch courses by this instructor (if you have an endpoint for this)
         try {
-          const coursesResponse = await axios.get(`/api/instructors/${instructorId}/courses`);
+          const coursesResponse = await axios.get(
+            `/api/instructors/${instructorId}/courses`,
+          );
           setInstructorCourses(coursesResponse.data.courses || []);
         } catch (courseErr) {
           console.error('Error fetching instructor courses:', courseErr);
           setInstructorCourses([]); // Set empty courses on error
         }
-        
+
         // Fetch other instructors for recommendations
         try {
           const allInstructorsResponse = await axios.get('/api/instructors');
-          
+
           // Filter out current instructor and format data
           const otherInstructors = allInstructorsResponse.data.instructors
-            .filter(inst => inst.id !== parseInt(instructorId))
-            .map(inst => ({
+            .filter((inst) => inst.id !== parseInt(instructorId))
+            .map((inst) => ({
               id: inst.id,
               name: inst.nom,
               specialty: inst.instructeur.specialite,
-              image: inst.image ? `/storage/${inst.image}` : '/default-profile.jpg',
+              image: inst.image
+                ? `/storage/${inst.image}`
+                : '/default-profile.jpg',
             }))
             .slice(0, 4); // Get only up to 4 instructors
-            
+
           setRelatedInstructors(otherInstructors);
         } catch (relatedErr) {
           console.error('Error fetching related instructors:', relatedErr);
           setRelatedInstructors([]);
         }
-        
+
         setError(null);
       } catch (err) {
         console.error('Error fetching instructor data:', err);
-        setError('Failed to load instructor details. The instructor may not exist or there was a network error.');
+        setError(
+          'Failed to load instructor details. The instructor may not exist or there was a network error.',
+        );
       } finally {
         setLoading(false);
       }
@@ -97,7 +107,8 @@ const InstructorProfile = () => {
       <div className="container-custom py-16 text-center">
         <h1 className="heading-lg mb-4">Instructor not found</h1>
         <p className="text-neutral-600 mb-8">
-          {error || "The instructor you're looking for doesn't exist or has been removed."}
+          {error ||
+            "The instructor you're looking for doesn't exist or has been removed."}
         </p>
         <Link to="/instructors" className="btn-primary px-6 py-2">
           View All Instructors
@@ -217,7 +228,7 @@ const InstructorProfile = () => {
               {instructorCourses.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                   {instructorCourses.map((course) => (
-                    <div 
+                    <div
                       key={course.id}
                       className="bg-white rounded-xl shadow-card overflow-hidden hover:shadow-lg transition-all group cursor-pointer"
                       onClick={() => navigate(`/courses/${course.id}`)}
@@ -246,7 +257,8 @@ const InstructorProfile = () => {
                             )}
                           </span>
                           <span className="text-sm text-neutral-600">
-                            {course.students_count?.toLocaleString() || 0} Students
+                            {course.students_count?.toLocaleString() || 0}{' '}
+                            Students
                           </span>
                         </div>
                       </div>

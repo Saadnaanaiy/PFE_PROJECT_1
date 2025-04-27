@@ -21,15 +21,15 @@ import ProtectedRoute from './components/ProtectedRoute';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import InstructorCoursesList from './pages/InstructorCoursesList';
 import CreateCourse from './pages/CreateCourse';
-
+import CourseShow from './pages/CourseShow';
 
 // Define InstructorRoute outside of App component
 const InstructorRoute = ({ children }) => {
   const { isAuthenticated, user } = useAuth();
-  
+
   // Check if user is authenticated and has instructor role
   const isInstructor = user?.role === 'instructeur';
-  
+
   if (!isAuthenticated() || !isInstructor) {
     // Redirect if not authenticated or not an instructor
     return <Navigate to="/login" replace />;
@@ -55,10 +55,6 @@ function App() {
     return () => window.removeEventListener('popstate', checkFullScreenRoute);
   }, []);
 
-  // Remove these lines that cause the error
-  // const { isInstructor } = useAuth(); 
-  // They're not needed here anymore since we moved the InstructorRoute component outside
-
   return (
     <AuthProvider>
       <div className="flex flex-col min-h-screen">
@@ -70,81 +66,94 @@ function App() {
             <Route path="/course/:courseId" element={<CourseDetails />} />
             <Route path="/courses" element={<CoursesList />} />
             <Route path="/categories" element={<CategoriesList />} />
-            <Route path="/categories/:categoryId" element={<CategoryCourses />} />
+            <Route
+              path="/categories/:categoryId"
+              element={<CategoryCourses />}
+            />
             <Route path="/instructors" element={<InstructorsList />} />
-            <Route path="/instructors/:instructorId" element={<InstructorProfile />} />
+            <Route
+              path="/instructors/:instructorId"
+              element={<InstructorProfile />}
+            />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
-            
+
             {/* Protected routes */}
-            <Route 
-              path="/profile" 
+            <Route
+              path="/profile"
               element={
                 <ProtectedRoute>
                   <Profile />
                 </ProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="/course/:courseId/learn" 
+            <Route
+              path="/course/:courseId/learn"
               element={
                 <ProtectedRoute>
                   <CourseVideoView onBack={() => window.history.back()} />
                 </ProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="/cart" 
+            <Route
+              path="/cart"
               element={
                 <ProtectedRoute>
                   <Cart />
                 </ProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="/checkout" 
+            <Route
+              path="/checkout"
               element={
                 <ProtectedRoute>
                   <Checkout />
                 </ProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="/payment/:courseId" 
+            <Route
+              path="/payment/:courseId"
               element={
                 <ProtectedRoute>
                   <Payment />
                 </ProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="/payment-success" 
+            <Route
+              path="/payment-success"
               element={
                 <ProtectedRoute>
                   <PaymentSuccess />
                 </ProtectedRoute>
-              } 
+              }
             />
 
-<Route 
-              path="/instructor/dashboard" 
+            <Route
+              path="/instructor/dashboard"
               element={
                 <ProtectedRoute>
                   <InstructorCoursesList />
                 </ProtectedRoute>
-              } 
+              }
             />
 
-<Route path="/instructor/courses/create" element={
-            <ProtectedRoute>
-              <CreateCourse />
-            </ProtectedRoute>
-          } />
-
-
-            
-            
-            
+            {/* Move this route inside the Routes component */}
+            <Route
+              path="/instructor/courses/create"
+              element={
+                <ProtectedRoute>
+                  <CreateCourse />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/instructor/courses/:id/edit"
+              element={
+                <ProtectedRoute>
+                  <CourseShow />
+                </ProtectedRoute>
+              }
+            />
           </Routes>
         </main>
         {!isFullScreenRoute && <Footer />}

@@ -30,7 +30,7 @@ class InstructorCourseController extends Controller
             }
             return $course;
         });
-        
+
         return response()->json([
             'courses' => $cours
         ]);
@@ -134,9 +134,22 @@ class InstructorCourseController extends Controller
 
         $cours->update($data);
 
+        // Create a new array with the course data
+        $courseData = $cours->toArray();
+
+        // Replace the image path with the full URL
+        if ($cours->image) {
+            $courseData['image'] = url('storage/' . $cours->image);
+        }
+
+        // If you have any relations that need to be included, add them here
+        if (isset($cours->categorie)) {
+            $courseData['categorie'] = $cours->categorie;
+        }
+
         return response()->json([
             'message' => 'Course updated successfully',
-            'course' => $cours
+            'course' => $courseData
         ]);
     }
 
@@ -176,6 +189,7 @@ class InstructorCourseController extends Controller
         ]);
     }
 
+    // Create a new category
     public function storeCategorie(Request $request)
     {
         $validated = $request->validate([
@@ -189,5 +203,44 @@ class InstructorCourseController extends Controller
             'message' => 'Category created successfully.',
             'categorie' => $categorie,
         ], 201);
+    }
+
+    // Update a category
+    public function updateCategorie(Request $request, $id)
+    {
+        $categorie = Categorie::findOrFail($id);
+
+        $validated = $request->validate([
+            'nom' => 'sometimes|required|string|max:255|unique:categories,nom,' . $id,
+            'description' => 'nullable|string|max:1000',
+        ]);
+
+        $categorie->update($validated);
+
+        return response()->json([
+            'message' => 'Category updated successfully.',
+            'categorie' => $categorie,
+        ]);
+    }
+
+    // Delete a category
+    public function destroyCategorie($id)
+    {
+        $categorie = Categorie::findOrFail($id);
+
+        // Check if any courses are using this category
+        $coursesCount = Cours::where('categorie_id', $id)->count();
+
+        if ($coursesCount > 0) {
+            return response()->json([
+                'message' => 'Cannot delete category. It is associated with ' . $coursesCount . ' course(s).',
+            ], 409); // Conflict status code
+        }
+
+        $categorie->delete();
+
+        return response()->json([
+            'message' => 'Category deleted successfully.'
+        ]);
     }
 }

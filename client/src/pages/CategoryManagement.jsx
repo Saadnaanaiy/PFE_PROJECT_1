@@ -2,9 +2,14 @@ import { useState, useEffect } from 'react';
 import { FiPlus, FiCheck, FiX } from 'react-icons/fi';
 import axios from 'axios';
 
-const CategoryManagement = ({ onCategoryAdded, preSelectedCategoryId = null }) => {
+const CategoryManagement = ({
+  onCategoryAdded,
+  preSelectedCategoryId = null,
+}) => {
   const [categories, setCategories] = useState([]);
-  const [selectedCategory, setSelectedCategory] = useState(preSelectedCategoryId);
+  const [selectedCategory, setSelectedCategory] = useState(
+    preSelectedCategoryId,
+  );
   const [showAddForm, setShowAddForm] = useState(false);
   const [newCategory, setNewCategory] = useState({ nom: '', description: '' });
   const [loading, setLoading] = useState(false);
@@ -28,13 +33,13 @@ const CategoryManagement = ({ onCategoryAdded, preSelectedCategoryId = null }) =
       setLoading(true);
       const response = await axios.get('/api/instructor/categories');
       setCategories(response.data.categories);
-      
+
       // If we have categories but no selection, select the first one
       if (response.data.categories.length > 0 && !selectedCategory) {
         setSelectedCategory(response.data.categories[0].id);
         if (onCategoryAdded) onCategoryAdded(response.data.categories[0].id);
       }
-      
+
       setError(null);
     } catch (err) {
       console.error('Error fetching categories:', err);
@@ -46,32 +51,35 @@ const CategoryManagement = ({ onCategoryAdded, preSelectedCategoryId = null }) =
 
   const handleCategoryCreate = async (e) => {
     e.preventDefault();
-    
+
     if (!newCategory.nom.trim()) {
       setError('Category name is required');
       return;
     }
-    
+
     try {
       setLoading(true);
-      const response = await axios.post('/api/instructor/categories', newCategory);
-      
+      const response = await axios.post(
+        '/api/instructor/categories',
+        newCategory,
+      );
+
       // Add new category to state
       const createdCategory = response.data.categorie;
       setCategories([...categories, createdCategory]);
-      
+
       // Select the newly created category
       setSelectedCategory(createdCategory.id);
       if (onCategoryAdded) onCategoryAdded(createdCategory.id);
-      
+
       // Reset form
       setNewCategory({ nom: '', description: '' });
       setShowAddForm(false);
       setSuccess('Category created successfully');
-      
+
       // Clear success message after 3 seconds
       setTimeout(() => setSuccess(null), 3000);
-      
+
       setError(null);
     } catch (err) {
       console.error('Error creating category:', err);
@@ -125,9 +133,15 @@ const CategoryManagement = ({ onCategoryAdded, preSelectedCategoryId = null }) =
       )}
 
       {showAddForm ? (
-        <form onSubmit={handleCategoryCreate} className="bg-white p-4 rounded-xl shadow-card mb-4">
+        <form
+          onSubmit={handleCategoryCreate}
+          className="bg-white p-4 rounded-xl shadow-card mb-4"
+        >
           <div className="mb-4">
-            <label htmlFor="nom" className="block text-sm font-medium text-neutral-700 mb-1">
+            <label
+              htmlFor="nom"
+              className="block text-sm font-medium text-neutral-700 mb-1"
+            >
               Category Name*
             </label>
             <input
@@ -141,9 +155,12 @@ const CategoryManagement = ({ onCategoryAdded, preSelectedCategoryId = null }) =
               required
             />
           </div>
-          
+
           <div className="mb-4">
-            <label htmlFor="description" className="block text-sm font-medium text-neutral-700 mb-1">
+            <label
+              htmlFor="description"
+              className="block text-sm font-medium text-neutral-700 mb-1"
+            >
               Description (Optional)
             </label>
             <textarea
@@ -156,9 +173,9 @@ const CategoryManagement = ({ onCategoryAdded, preSelectedCategoryId = null }) =
               rows="3"
             />
           </div>
-          
+
           <div className="flex justify-end">
-            <button 
+            <button
               type="submit"
               disabled={loading}
               className="btn-primary px-4 py-2 flex items-center gap-2"
@@ -195,9 +212,13 @@ const CategoryManagement = ({ onCategoryAdded, preSelectedCategoryId = null }) =
               >
                 <div className="font-medium">{category.nom}</div>
                 {category.description && (
-                  <div className={`text-xs mt-1 line-clamp-2 ${
-                    selectedCategory === category.id ? 'text-white/80' : 'text-neutral-500'
-                  }`}>
+                  <div
+                    className={`text-xs mt-1 line-clamp-2 ${
+                      selectedCategory === category.id
+                        ? 'text-white/80'
+                        : 'text-neutral-500'
+                    }`}
+                  >
                     {category.description}
                   </div>
                 )}
@@ -205,7 +226,9 @@ const CategoryManagement = ({ onCategoryAdded, preSelectedCategoryId = null }) =
             ))
           ) : (
             <div className="col-span-full text-center py-8 bg-white rounded-lg shadow-card">
-              <p className="text-neutral-600">No categories found. Create one to get started.</p>
+              <p className="text-neutral-600">
+                No categories found. Create one to get started.
+              </p>
             </div>
           )}
         </div>

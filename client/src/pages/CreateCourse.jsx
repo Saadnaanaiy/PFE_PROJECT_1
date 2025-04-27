@@ -40,15 +40,15 @@ const CreateCourse = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!formData.categorie_id) {
       setError('Please select or create a category first');
       return;
     }
-    
+
     try {
       setLoading(true);
-      
+
       // Create FormData object for file upload
       const courseFormData = new FormData();
       for (const key in formData) {
@@ -56,16 +56,16 @@ const CreateCourse = () => {
           courseFormData.append(key, formData[key]);
         }
       }
-      
+
       await axios.post('/api/instructor/courses', courseFormData, {
         headers: {
           'Content-Type': 'multipart/form-data'
         }
       });
-      
+
       // Redirect to courses list
       navigate('/instructor/courses');
-      
+
     } catch (err) {
       console.error('Error creating course:', err);
       setError(err.response?.data?.message || 'Failed to create course');
@@ -97,8 +97,8 @@ const CreateCourse = () => {
           transition={{ duration: 0.5 }}
           className="mb-8"
         >
-          <button 
-            onClick={() => navigate('/instructor/courses')} 
+          <button
+            onClick={() => navigate('/instructor/courses')}
             className="flex items-center text-primary hover:text-primary-dark mb-4"
           >
             <FiArrowLeft className="mr-2" /> Back to Courses
@@ -122,7 +122,7 @@ const CreateCourse = () => {
           className="bg-white rounded-xl shadow-card p-6 mb-8"
         >
           <h2 className="text-xl font-semibold mb-6">1. Choose Category</h2>
-          
+
           {/* Category Management Component */}
           <CategoryManagement onCategoryAdded={handleCategorySelect} />
         </motion.div>
@@ -135,7 +135,7 @@ const CreateCourse = () => {
           className="bg-white rounded-xl shadow-card p-6"
         >
           <h2 className="text-xl font-semibold mb-6">2. Course Details</h2>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <div className="col-span-full">
               <label htmlFor="titre" className="block text-sm font-medium text-neutral-700 mb-1">
@@ -152,7 +152,7 @@ const CreateCourse = () => {
                 required
               />
             </div>
-            
+
             <div className="col-span-full">
               <label htmlFor="description" className="block text-sm font-medium text-neutral-700 mb-1">
                 Course Description*
@@ -168,7 +168,7 @@ const CreateCourse = () => {
                 required
               ></textarea>
             </div>
-            
+
             <div>
               <label htmlFor="prix" className="block text-sm font-medium text-neutral-700 mb-1">
                 <div className="flex items-center gap-1">
@@ -189,7 +189,7 @@ const CreateCourse = () => {
                 required
               />
             </div>
-            
+
             <div>
               <label htmlFor="dureeMinutes" className="block text-sm font-medium text-neutral-700 mb-1">
                 <div className="flex items-center gap-1">
@@ -209,7 +209,7 @@ const CreateCourse = () => {
                 required
               />
             </div>
-            
+
             <div>
               <label htmlFor="niveau" className="block text-sm font-medium text-neutral-700 mb-1">
                 <div className="flex items-center gap-1">
@@ -230,7 +230,7 @@ const CreateCourse = () => {
                 <option value="Avancé">Advanced</option>
               </select>
             </div>
-            
+
             <div className="col-span-full">
               <label className="block text-sm font-medium text-neutral-700 mb-1">
                 <div className="flex items-center gap-1">
@@ -238,16 +238,16 @@ const CreateCourse = () => {
                   Course Image
                 </div>
               </label>
-              
+
               <div className="mt-1 flex items-center">
                 {imagePreview ? (
                   <div className="relative group">
-                    <img 
-                      src={imagePreview} 
-                      alt="Course preview" 
+                    <img
+                      src={imagePreview}
+                      alt="Course preview"
                       className="w-40 h-40 object-cover rounded-lg border border-neutral-300"
                     />
-                    <div 
+                    <div
                       className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-lg cursor-pointer"
                       onClick={() => document.getElementById('image').click()}
                     >
@@ -255,7 +255,7 @@ const CreateCourse = () => {
                     </div>
                   </div>
                 ) : (
-                  <div 
+                  <div
                     onClick={() => document.getElementById('image').click()}
                     className="w-40 h-40 flex flex-col items-center justify-center border-2 border-dashed border-neutral-300 rounded-lg hover:border-primary cursor-pointer bg-neutral-50"
                   >
@@ -277,7 +277,7 @@ const CreateCourse = () => {
               </p>
             </div>
           </div>
-          
+
           <div className="flex justify-end gap-4">
             <button
               type="button"
