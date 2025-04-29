@@ -22,6 +22,7 @@ const Profile = () => {
             `http://localhost:8000/api/instructors/${user.id}`,
           );
           setInstructorDetails(response.data);
+          console.log(response.data);
           setLoading(false);
         } catch (error) {
           console.error('Error fetching instructor details:', error);

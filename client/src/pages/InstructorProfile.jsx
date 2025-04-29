@@ -25,6 +25,8 @@ const InstructorProfile = () => {
           `/api/instructors/${instructorId}`,
         );
 
+        console.log(instructorResponse.data);
+
         // Format instructor data
         const instructorData = {
           id: instructorResponse.data.id,

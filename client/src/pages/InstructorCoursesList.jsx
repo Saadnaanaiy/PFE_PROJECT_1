@@ -1,7 +1,24 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { FiSearch, FiPlus, FiFilter, FiTag } from 'react-icons/fi';
+import {
+  FiSearch,
+  FiPlus,
+  FiFilter,
+  FiTag,
+  FiBook,
+  FiCode,
+  FiMusic,
+  FiCamera,
+  FiDollarSign,
+  FiGlobe,
+  FiHeart,
+  FiTrendingUp,
+  FiLayers,
+  FiCpu,
+  FiBriefcase,
+  FiAward,
+} from 'react-icons/fi';
 import moroccanPattern from '../assets/moroccan-pattern.svg';
 import axios from 'axios';
 
@@ -10,10 +27,34 @@ const InstructorCoursesList = () => {
   const [courses, setCourses] = useState([]);
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('');
+  const [tempSelectedCategory, setTempSelectedCategory] = useState('');
   const [showCategoryFilter, setShowCategoryFilter] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const navigate = useNavigate();
+
+  // Icons array to use for categories - will be assigned based on category ID
+  const categoryIcons = [
+    FiBook, // General education
+    FiCode, // Programming
+    FiMusic, // Music
+    FiCamera, // Photography
+    FiDollarSign, // Finance
+    FiGlobe, // Languages
+    FiHeart, // Health & Fitness
+    FiTrendingUp, // Business
+    FiLayers, // Design
+    FiCpu, // Technology
+    FiBriefcase, // Career Development
+    FiAward, // Self Improvement
+  ];
+
+  // Function to get an icon based on category ID
+  const getCategoryIcon = (categoryId) => {
+    // Use modulo operation to cycle through available icons if we have more categories than icons
+    const iconIndex = (categoryId - 1) % categoryIcons.length;
+    return categoryIcons[iconIndex] || FiTag; // Fallback to FiTag if something goes wrong
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -23,11 +64,11 @@ const InstructorCoursesList = () => {
         // Fetch courses and categories in parallel
         const [coursesResponse, categoriesResponse] = await Promise.all([
           axios.get('/api/instructor/courses'),
-          axios.get('/api/instructor/categories')
+          axios.get('/api/instructor/categories'),
         ]);
 
         // Transform courses data
-        const formattedCourses = coursesResponse.data.courses.map(course => ({
+        const formattedCourses = coursesResponse.data.courses.map((course) => ({
           id: course.id,
           title: course.titre,
           description: course.description,
@@ -73,22 +114,37 @@ const InstructorCoursesList = () => {
 
   // Toggle category filter dropdown
   const toggleCategoryFilter = () => {
+    // Reset temp category to the current selection when opening
+    if (!showCategoryFilter) {
+      setTempSelectedCategory(selectedCategory);
+    }
     setShowCategoryFilter(!showCategoryFilter);
+  };
+
+  // Apply filter button handler
+  const handleApplyFilter = () => {
+    setSelectedCategory(tempSelectedCategory);
+    setShowCategoryFilter(false);
+  };
+
+  // Clear filter handler
+  const handleClearFilter = () => {
+    setTempSelectedCategory('');
   };
 
   // Function to filter courses based on search term and selected category
   const getFilteredCourses = () => {
-    return courses.filter(
-      (course) => {
-        const matchSearch = course.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                            course.category.toLowerCase().includes(searchTerm.toLowerCase());
+    return courses.filter((course) => {
+      const matchSearch =
+        course.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        course.category.toLowerCase().includes(searchTerm.toLowerCase());
 
-        const matchCategory = selectedCategory === '' ||
-                             course.categoryId === parseInt(selectedCategory, 10);
+      const matchCategory =
+        selectedCategory === '' ||
+        course.categoryId === parseInt(selectedCategory, 10);
 
-        return matchSearch && matchCategory;
-      }
-    );
+      return matchSearch && matchCategory;
+    });
   };
 
   const filteredCourses = getFilteredCourses();
@@ -122,7 +178,8 @@ const InstructorCoursesList = () => {
         >
           <h1 className="heading-lg mb-4">Manage Your Courses</h1>
           <p className="text-neutral-600 max-w-2xl mx-auto">
-            Create, edit, and manage your course content. Track student engagement and monitor course performance.
+            Create, edit, and manage your course content. Track student
+            engagement and monitor course performance.
           </p>
         </motion.div>
 
@@ -165,6 +222,11 @@ const InstructorCoursesList = () => {
             >
               <FiFilter className="text-lg" />
               Filter
+              {selectedCategory && (
+                <span className="ml-1 bg-primary text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">
+                  1
+                </span>
+              )}
             </button>
 
             {showCategoryFilter && (
@@ -172,8 +234,8 @@ const InstructorCoursesList = () => {
                 <div className="p-4">
                   <h4 className="font-medium mb-2">Filter by Category</h4>
                   <select
-                    value={selectedCategory}
-                    onChange={(e) => setSelectedCategory(e.target.value)}
+                    value={tempSelectedCategory}
+                    onChange={(e) => setTempSelectedCategory(e.target.value)}
                     className="w-full p-2 border border-neutral-300 rounded-lg mb-3"
                   >
                     <option value="">All Categories</option>
@@ -185,13 +247,13 @@ const InstructorCoursesList = () => {
                   </select>
                   <div className="flex justify-between">
                     <button
-                      onClick={() => setSelectedCategory('')}
+                      onClick={handleClearFilter}
                       className="text-neutral-600 text-sm hover:text-primary"
                     >
                       Clear Filter
                     </button>
                     <button
-                      onClick={toggleCategoryFilter}
+                      onClick={handleApplyFilter}
                       className="text-primary text-sm font-medium"
                     >
                       Apply
@@ -244,29 +306,50 @@ const InstructorCoursesList = () => {
 
               {categories.length > 0 ? (
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                  {categories.map((category) => (
-                    <div
-                      key={category.id}
-                      className="bg-white p-6 rounded-xl shadow-card hover:shadow-lg transition-all cursor-pointer flex flex-col items-center text-center group"
-                    >
-                      <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-3">
-                        <FiTag className="text-primary text-xl" />
+                  {categories.map((category) => {
+                    // Get the icon component based on category ID
+                    const IconComponent = getCategoryIcon(category.id);
+
+                    return (
+                      <div
+                        key={category.id}
+                        className="bg-white p-6 rounded-xl shadow-card hover:shadow-lg transition-all cursor-pointer flex flex-col items-center text-center group"
+                        onClick={() => {
+                          setSelectedCategory(category.id.toString());
+                          window.scrollTo({
+                            top:
+                              document.getElementById('all-courses').offsetTop -
+                              100,
+                            behavior: 'smooth',
+                          });
+                        }}
+                      >
+                        <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-3">
+                          <IconComponent className="text-primary text-xl" />
+                        </div>
+                        <h3 className="font-heading font-semibold mb-1 group-hover:text-primary transition-colors">
+                          {category.nom}
+                        </h3>
+                        <p className="text-sm text-neutral-500 line-clamp-2">
+                          {category.description || 'No description'}
+                        </p>
+                        <div className="mt-2 text-xs text-primary font-medium">
+                          {
+                            courses.filter(
+                              (course) => course.categoryId === category.id,
+                            ).length
+                          }{' '}
+                          Courses
+                        </div>
                       </div>
-                      <h3 className="font-heading font-semibold mb-1 group-hover:text-primary transition-colors">
-                        {category.nom}
-                      </h3>
-                      <p className="text-sm text-neutral-500 line-clamp-2">
-                        {category.description || 'No description'}
-                      </p>
-                      <div className="mt-2 text-xs text-primary font-medium">
-                        {courses.filter(course => course.categoryId === category.id).length} Courses
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="text-center py-8 bg-white rounded-xl shadow-card">
-                  <h3 className="text-lg font-medium mb-2">No categories found</h3>
+                  <h3 className="text-lg font-medium mb-2">
+                    No categories found
+                  </h3>
                   <p className="text-neutral-600 mb-4">
                     No categories are available for your courses
                   </p>
@@ -304,9 +387,13 @@ const InstructorCoursesList = () => {
                           <h3 className="font-heading text-lg font-semibold group-hover:text-primary transition-colors">
                             {course.title}
                           </h3>
-                          <span className="text-primary font-medium">${course.price.toFixed(2)}</span>
+                          <span className="text-primary font-medium">
+                            ${course.price.toFixed(2)}
+                          </span>
                         </div>
-                        <p className="text-primary text-sm mb-3">{course.category}</p>
+                        <p className="text-primary text-sm mb-3">
+                          {course.category}
+                        </p>
                         <div className="mb-3">
                           <div className="w-full bg-neutral-200 rounded-full h-2">
                             <div
@@ -316,12 +403,19 @@ const InstructorCoursesList = () => {
                           </div>
                           <div className="flex justify-between mt-1 text-xs text-neutral-500">
                             <span>{course.progress}% complete</span>
-                            <span>{course.progress === 100 ? 'Published' : 'Draft'}</span>
+                            <span>
+                              {course.progress === 100 ? 'Published' : 'Draft'}
+                            </span>
                           </div>
                         </div>
                         <div className="flex justify-between text-sm text-neutral-600">
-                          <span>{Math.floor(course.duration / 60)}h {course.duration % 60}m</span>
-                          <span>{course.students.toLocaleString()} Students</span>
+                          <span>
+                            {Math.floor(course.duration / 60)}h{' '}
+                            {course.duration % 60}m
+                          </span>
+                          <span>
+                            {course.students.toLocaleString()} Students
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -331,10 +425,23 @@ const InstructorCoursesList = () => {
             )}
 
             {/* All Courses */}
-            <div className="mb-8">
-              <h2 className="text-2xl font-heading font-bold mb-8">
-                All Courses
-              </h2>
+            <div id="all-courses" className="mb-8">
+              <div className="flex justify-between items-center mb-8">
+                <h2 className="text-2xl font-heading font-bold">All Courses</h2>
+                {selectedCategory && (
+                  <button
+                    onClick={() => setSelectedCategory('')}
+                    className="flex items-center text-sm text-primary"
+                  >
+                    <span>Clear Filter</span>
+                    <span className="ml-2 bg-primary/10 text-primary rounded-full px-2 py-1">
+                      {categories.find(
+                        (c) => c.id.toString() === selectedCategory,
+                      )?.nom || 'Category'}
+                    </span>
+                  </button>
+                )}
+              </div>
 
               {filteredCourses.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -361,7 +468,9 @@ const InstructorCoursesList = () => {
                             <h3 className="font-heading font-semibold text-lg mb-1 group-hover:text-primary transition-colors">
                               {course.title}
                             </h3>
-                            <span className="text-primary font-medium">${course.price.toFixed(2)}</span>
+                            <span className="text-primary font-medium">
+                              ${course.price.toFixed(2)}
+                            </span>
                           </div>
                           <p className="text-primary text-sm mb-2">
                             {course.category} • {course.level}
@@ -378,11 +487,18 @@ const InstructorCoursesList = () => {
                             </div>
                             <div className="flex justify-between mt-1 text-xs text-neutral-500">
                               <span>{course.progress}% complete</span>
-                              <span>{course.progress === 100 ? 'Published' : 'Draft'}</span>
+                              <span>
+                                {course.progress === 100
+                                  ? 'Published'
+                                  : 'Draft'}
+                              </span>
                             </div>
                           </div>
                           <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm text-neutral-600">
-                            <span>{Math.floor(course.duration / 60)}h {course.duration % 60}m</span>
+                            <span>
+                              {Math.floor(course.duration / 60)}h{' '}
+                              {course.duration % 60}m
+                            </span>
                             <span>
                               {course.students.toLocaleString()} Students
                             </span>
@@ -442,8 +558,9 @@ const InstructorCoursesList = () => {
               Ready to Create Amazing Content?
             </h3>
             <p className="text-neutral-600 mb-6 max-w-2xl mx-auto">
-              Share your knowledge and expertise with students worldwide.
-              Our platform provides all the tools you need to create engaging and effective courses.
+              Share your knowledge and expertise with students worldwide. Our
+              platform provides all the tools you need to create engaging and
+              effective courses.
             </p>
             <button
               onClick={handleCreateCourse}

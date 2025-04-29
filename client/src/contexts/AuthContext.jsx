@@ -109,9 +109,9 @@ export const AuthProvider = ({ children }) => {
     return !!user;
   };
 
-  // Add role checking functions
+  // Role checking functions
   const isAdmin = () => {
-    return user?.role === 'administrateur';
+    return user?.role === 'administrateur'; // Keep the French version for consistency
   };
 
   const isInstructor = () => {

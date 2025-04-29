@@ -153,6 +153,15 @@ const CourseShow = () => {
       }
 
       // Redirect to courses list with success message
+      navigate('/instructor/dashboard', {
+        state: {
+          message: isNewCourse
+            ? 'Course created successfully'
+            : 'Course updated successfully',
+          type: 'success',
+        },
+      });
+
       navigate('/instructor/courses', {
         state: {
           message: isNewCourse
@@ -181,12 +190,19 @@ const CourseShow = () => {
       await axios.delete(`/api/instructor/courses/${id}`);
 
       // Redirect to courses list with success message
-      navigate('/instructor/courses', {
+      navigate('/instructor/dashboard', {
         state: {
           message: 'Course deleted successfully',
           type: 'success',
         },
       });
+
+      // navigate('/instructor/courses', {
+      //   state: {
+      //     message: 'Course deleted successfully',
+      //     type: 'success',
+      //   },
+      // });
     } catch (err) {
       console.error('Error deleting course:', err);
       setError(
@@ -280,12 +296,14 @@ const CourseShow = () => {
             <div className="bg-white p-6 rounded-xl shadow-card mb-8">
               <div className="flex justify-between items-center mb-2">
                 <h3 className="font-medium">Course Completion</h3>
-                <span className="text-primary font-medium">{progress}%</span>
+                <span className="text-primary font-medium">
+                  {course.progress}%
+                </span>
               </div>
               <div className="w-full bg-neutral-200 rounded-full h-2.5">
                 <div
                   className="bg-primary h-2.5 rounded-full transition-all duration-500"
-                  style={{ width: `${progress}%` }}
+                  style={{ width: `${course.progress}%` }}
                 ></div>
               </div>
               <p className="text-sm text-neutral-500 mt-2">

@@ -1,8 +1,15 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { FiSearch, FiShoppingCart, FiMenu, FiX, FiUser, FiLogOut } from 'react-icons/fi';
-// Import graduation cap icon from another icon set that has this icon
-import { FaGraduationCap } from 'react-icons/fa';
+import {
+  FiSearch,
+  FiShoppingCart,
+  FiMenu,
+  FiX,
+  FiUser,
+  FiLogOut,
+} from 'react-icons/fi';
+// Import graduation cap icon and admin shield icon
+import { FaGraduationCap, FaShieldAlt } from 'react-icons/fa';
 import Logo from './Logo';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -10,7 +17,7 @@ const Header = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
-  const { user, isAuthenticated, logout, isInstructor } = useAuth();
+  const { user, isAuthenticated, logout, isInstructor, isAdmin } = useAuth();
   const navigate = useNavigate();
 
   // Handle scroll effect
@@ -27,10 +34,23 @@ const Header = () => {
 
   // Get the appropriate icon based on user role
   const getUserRoleIcon = () => {
-    if (isInstructor()) {
+    if (isAdmin()) {
+      return <FaShieldAlt className="w-4 h-4 text-primary" />; // Shield icon for admins
+    } else if (isInstructor()) {
       return <FaGraduationCap className="w-4 h-4 text-primary" />; // Graduation cap for instructors
     } else {
       return <FiUser className="w-4 h-4 text-primary" />; // Default user icon for students
+    }
+  };
+
+  // Get role display text
+  const getUserRoleText = () => {
+    if (isAdmin()) {
+      return 'Administrator';
+    } else if (isInstructor()) {
+      return 'Instructor';
+    } else {
+      return 'Student';
     }
   };
 
@@ -59,29 +79,46 @@ const Header = () => {
             </div>
 
             <div className="flex items-center space-x-6">
-              <Link to="/categories" className="text-neutral-800 hover:text-primary font-medium">
-                Categories
-              </Link>
-              <Link to="/courses" className="text-neutral-800 hover:text-primary font-medium">
-                Courses
-              </Link>
-              {/* Conditionally show Instructors link or Dashboard link */}
-              {isAuthenticated() && isInstructor() ? (
-                 <Link to="/instructor/dashboard" className="text-neutral-800 hover:text-primary font-medium">
-                   Dashboard
-                 </Link>
-              ) : (
-                 <Link to="/instructors" className="text-neutral-800 hover:text-primary font-medium">
-                   Instructors
-                 </Link>
+              {/* Don't show category/course/instructor links for admin */}
+              {!(isAuthenticated() && isAdmin()) && (
+                <>
+                  <Link
+                    to="/categories"
+                    className="text-neutral-800 hover:text-primary font-medium"
+                  >
+                    Categories
+                  </Link>
+                  <Link
+                    to="/courses"
+                    className="text-neutral-800 hover:text-primary font-medium"
+                  >
+                    Courses
+                  </Link>
+                  {/* Conditionally show Instructors link or Dashboard link */}
+                  {isAuthenticated() && isInstructor() ? (
+                    <Link
+                      to="/instructor/dashboard"
+                      className="text-neutral-800 hover:text-primary font-medium"
+                    >
+                      Dashboard
+                    </Link>
+                  ) : (
+                    <Link
+                      to="/instructors"
+                      className="text-neutral-800 hover:text-primary font-medium"
+                    >
+                      Instructors
+                    </Link>
+                  )}
+                </>
               )}
             </div>
 
             <div className="flex items-center space-x-4">
               {isAuthenticated() ? (
                 <>
-                  {/* Cart Icon (Maybe hide for instructors?) */}
-                  {!isInstructor() && (
+                  {/* Cart Icon (Hide for admins and instructors) */}
+                  {!isInstructor() && !isAdmin() && (
                     <Link to="/cart" className="relative">
                       <FiShoppingCart className="w-6 h-6 text-neutral-800 hover:text-primary" />
                       <span className="absolute -top-1 -right-1 bg-secondary text-white text-xs font-bold rounded-full h-4 w-4 flex items-center justify-center">
@@ -91,7 +128,7 @@ const Header = () => {
                   )}
                   {/* Profile Menu */}
                   <div className="relative">
-                    <button 
+                    <button
                       onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
                       className="flex items-center space-x-2 text-neutral-800 hover:text-primary"
                     >
@@ -100,7 +137,7 @@ const Header = () => {
                       </div>
                       <span className="font-medium">{user?.nom || 'User'}</span>
                     </button>
-                    
+
                     {isProfileMenuOpen && (
                       <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10">
                         <div className="px-4 py-2 border-b border-neutral-200">
@@ -109,22 +146,33 @@ const Header = () => {
                               {getUserRoleIcon()}
                             </div>
                             <div>
-                              <p className="text-sm font-medium">{user?.nom || 'User'}</p>
+                              <p className="text-sm font-medium">
+                                {user?.nom || 'User'}
+                              </p>
                               <p className="text-xs text-neutral-500">
-                                {isInstructor() ? 'Instructor' : 'Student'}
+                                {getUserRoleText()}
                               </p>
                             </div>
                           </div>
                         </div>
-                        <Link 
-                          to="/profile" 
+                        <Link
+                          to="/profile"
                           className="block px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-100"
                           onClick={() => setIsProfileMenuOpen(false)}
                         >
                           Profile
                         </Link>
-                        {/* Add Instructor Dashboard link here too if needed */}
-                        {isInstructor() && (
+                        {/* Show appropriate dashboard link based on role */}
+                        {isAdmin() && (
+                          <Link
+                            to="/admin/dashboard"
+                            className="block px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-100"
+                            onClick={() => setIsProfileMenuOpen(false)}
+                          >
+                            Admin Dashboard
+                          </Link>
+                        )}
+                        {isInstructor() && !isAdmin() && (
                           <Link
                             to="/instructor/dashboard"
                             className="block px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-100"
@@ -133,7 +181,7 @@ const Header = () => {
                             Instructor Dashboard
                           </Link>
                         )}
-                        <button 
+                        <button
                           onClick={() => {
                             handleLogout();
                             setIsProfileMenuOpen(false);
@@ -162,7 +210,7 @@ const Header = () => {
 
           {/* Mobile menu button */}
           <div className="flex items-center md:hidden">
-            {isAuthenticated() && (
+            {isAuthenticated() && !isAdmin() && (
               <Link to="/cart" className="relative mr-4">
                 <FiShoppingCart className="w-6 h-6 text-neutral-800" />
                 <span className="absolute -top-1 -right-1 bg-secondary text-white text-xs font-bold rounded-full h-4 w-4 flex items-center justify-center">
@@ -196,7 +244,7 @@ const Header = () => {
                   <div>
                     <p className="font-medium">{user?.nom || 'User'}</p>
                     <p className="text-xs text-neutral-500">
-                      {isInstructor() ? 'Instructor' : 'Student'}
+                      {getUserRoleText()}
                     </p>
                   </div>
                 </div>
@@ -211,39 +259,44 @@ const Header = () => {
               <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-neutral-500" />
             </div>
             <div className="flex flex-col space-y-4 pb-4">
-              <Link 
-                to="/categories"
-                className="text-neutral-800 hover:text-primary font-medium px-1 py-2 border-b border-neutral-200"
-                onClick={() => setIsOpen(false)}
-              >
-                Categories
-              </Link>
-              <Link 
-                to="/courses"
-                className="text-neutral-800 hover:text-primary font-medium px-1 py-2 border-b border-neutral-200"
-                onClick={() => setIsOpen(false)}
-              >
-                Courses
-              </Link>
-              {/* Conditional Mobile Link */}
-              {isAuthenticated() && isInstructor() ? (
-                <Link
-                  to="/instructor/dashboard"
-                  className="text-neutral-800 hover:text-primary font-medium px-1 py-2 border-b border-neutral-200"
-                  onClick={() => setIsOpen(false)}
-                >
-                  Dashboard
-                </Link>
-              ) : (
-                <Link
-                  to="/instructors"
-                  className="text-neutral-800 hover:text-primary font-medium px-1 py-2 border-b border-neutral-200"
-                  onClick={() => setIsOpen(false)}
-                >
-                  Instructors
-                </Link>
+              {/* Don't show these links for admin in mobile view either */}
+              {!(isAuthenticated() && isAdmin()) && (
+                <>
+                  <Link
+                    to="/categories"
+                    className="text-neutral-800 hover:text-primary font-medium px-1 py-2 border-b border-neutral-200"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    Categories
+                  </Link>
+                  <Link
+                    to="/courses"
+                    className="text-neutral-800 hover:text-primary font-medium px-1 py-2 border-b border-neutral-200"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    Courses
+                  </Link>
+                  {/* Conditional Mobile Link */}
+                  {isAuthenticated() && isInstructor() ? (
+                    <Link
+                      to="/instructor/dashboard"
+                      className="text-neutral-800 hover:text-primary font-medium px-1 py-2 border-b border-neutral-200"
+                      onClick={() => setIsOpen(false)}
+                    >
+                      Dashboard
+                    </Link>
+                  ) : (
+                    <Link
+                      to="/instructors"
+                      className="text-neutral-800 hover:text-primary font-medium px-1 py-2 border-b border-neutral-200"
+                      onClick={() => setIsOpen(false)}
+                    >
+                      Instructors
+                    </Link>
+                  )}
+                </>
               )}
-              
+
               {isAuthenticated() ? (
                 <>
                   {/* Profile Link */}
@@ -254,6 +307,16 @@ const Header = () => {
                   >
                     Profile
                   </Link>
+                  {/* Admin Dashboard Link (Mobile) */}
+                  {isAdmin() && (
+                    <Link
+                      to="/admin/dashboard"
+                      className="text-neutral-800 hover:text-primary font-medium px-1 py-2 border-b border-neutral-200"
+                      onClick={() => setIsOpen(false)}
+                    >
+                      Admin Dashboard
+                    </Link>
+                  )}
                   {/* Logout Button */}
                   <button
                     onClick={() => {

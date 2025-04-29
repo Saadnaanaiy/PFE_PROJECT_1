@@ -21,9 +21,10 @@ import ProtectedRoute from './components/ProtectedRoute';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import InstructorCoursesList from './pages/InstructorCoursesList';
 import CreateCourse from './pages/CreateCourse';
-import CourseShow from './pages/CourseShow';
+import CourseEdit from './pages/CourseEdit';
+import AdminDashboard from './pages/AdminDashboard';
 
-// Define InstructorRoute outside of App component
+// Define InstructorRoute component
 const InstructorRoute = ({ children }) => {
   const { isAuthenticated, user } = useAuth();
 
@@ -32,6 +33,17 @@ const InstructorRoute = ({ children }) => {
 
   if (!isAuthenticated() || !isInstructor) {
     // Redirect if not authenticated or not an instructor
+    return <Navigate to="/login" replace />;
+  }
+  return children;
+};
+
+// Define AdminRoute component
+const AdminRoute = ({ children }) => {
+  const { isAuthenticated, isAdmin } = useAuth();
+
+  if (!isAuthenticated() || !isAdmin()) {
+    // Redirect if not authenticated or not an admin
     return <Navigate to="/login" replace />;
   }
   return children;
@@ -128,32 +140,42 @@ function App() {
               }
             />
 
+            {/* Instructor routes */}
             <Route
               path="/instructor/dashboard"
               element={
-                <ProtectedRoute>
+                <InstructorRoute>
                   <InstructorCoursesList />
-                </ProtectedRoute>
+                </InstructorRoute>
               }
             />
-
-            {/* Move this route inside the Routes component */}
             <Route
               path="/instructor/courses/create"
               element={
-                <ProtectedRoute>
+                <InstructorRoute>
                   <CreateCourse />
-                </ProtectedRoute>
+                </InstructorRoute>
               }
             />
             <Route
               path="/instructor/courses/:id/edit"
               element={
-                <ProtectedRoute>
-                  <CourseShow />
-                </ProtectedRoute>
+                <InstructorRoute>
+                  <CourseEdit />
+                </InstructorRoute>
               }
             />
+
+            {/* Admin routes */}
+            <Route
+              path="/admin/dashboard"
+              element={
+                <AdminRoute>
+                  <AdminDashboard />
+                </AdminRoute>
+              }
+            />
+            {/* Add additional admin routes here as needed */}
           </Routes>
         </main>
         {!isFullScreenRoute && <Footer />}
