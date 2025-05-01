@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Cours;
 use App\Models\Categorie;
+use App\Models\Lecon;
 use App\Models\Section;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -209,7 +210,17 @@ class InstructorCourseController extends Controller
     // Get all categories
     public function getCategories()
     {
-        $categories = Categorie::all();
+        $instructeur = Auth::user()->instructeur;
+
+        if (!$instructeur) {
+            return response()->json([
+                'message' => 'You are not registered as an instructor'
+            ], 403);
+        }
+
+        $categories = Categorie::whereHas('cours', function ($query) use ($instructeur) {
+            $query->where('instructeur_id', $instructeur->id);
+        })->get();
 
         return response()->json([
             'categories' => $categories
@@ -447,5 +458,35 @@ class InstructorCourseController extends Controller
         return response()->json([
             'message' => 'Sections reordered successfully'
         ]);
+    }
+
+    public function storeLecon(Request $request, Section $section)
+    {
+        $data = $request->validate([
+            'titre'      => 'required|string|max:255',
+            'ordre'      => 'nullable|integer',
+            'estGratuite' => 'boolean',
+        ]);
+
+        $lecon = $section->lecons()->create([
+            'titre'      => $data['titre'],
+            'ordre'      => $data['ordre'] ?? $section->lecons()->count() + 1,
+            'estGratuite' => $data['estGratuite'] ?? false,
+        ]);
+
+        return response()->json($lecon, 201);
+    }
+
+    public function storeVideo(Request $request, Lecon $lecon)
+    {
+        $data = $request->validate([
+            'titre'        => 'required|string|max:255',
+            'url'          => 'required|url',
+            'dureeMinutes' => 'required|integer|min:1',
+        ]);
+
+        $video = $lecon->video()->create($data);
+
+        return response()->json($video, 201);
     }
 }

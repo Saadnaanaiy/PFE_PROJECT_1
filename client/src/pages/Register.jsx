@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { FiMail, FiLock, FiUser, FiInfo, FiBook, FiImage, FiEye, FiEyeOff, FiUpload } from 'react-icons/fi';
 import morocademyIcon from '../assets/morocademy.ico';
 import axios from 'axios';
+import { toast } from 'react-toastify';
 
 const Register = () => {
   const navigate = useNavigate();
@@ -36,7 +37,7 @@ const Register = () => {
 
   const handleChange = (e) => {
     const { name, value, type, checked, files } = e.target;
-    
+
     if (type === 'file') {
       if (files && files[0]) {
         // Handle file input
@@ -44,10 +45,10 @@ const Register = () => {
           ...prev,
           [name]: files[0]
         }));
-        
+
         // Save file name for display
         setFileName(files[0].name);
-        
+
         // Create image preview
         const reader = new FileReader();
         reader.onload = (e) => {
@@ -69,14 +70,14 @@ const Register = () => {
       setError('Please fill in all required fields');
       return false;
     }
-    
+
     // Basic email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(formData.email)) {
       setError('Please enter a valid email address');
       return false;
     }
-    
+
     return true;
   };
 
@@ -85,28 +86,28 @@ const Register = () => {
       setError('Password fields are required');
       return false;
     }
-    
+
     if (!passwordMatch) {
       setError('Passwords do not match');
       return false;
     }
-    
+
     if (formData.password.length < 6) {
       setError('Password must be at least 6 characters long');
       return false;
     }
-    
+
     // Instructor-specific validation
     if (formData.role === 'instructeur' && (!formData.bio || !formData.specialite)) {
       setError('Bio and specialization are required for instructors');
       return false;
     }
-    
+
     if (!formData.acceptTerms) {
       setError('Please accept the terms and conditions');
       return false;
     }
-    
+
     return true;
   };
 
@@ -143,7 +144,7 @@ const Register = () => {
 
     try {
       setLoading(true);
-      
+
       // Create FormData object for file upload
       const formDataToSend = new FormData();
       formDataToSend.append('nom', formData.nom);
@@ -151,16 +152,16 @@ const Register = () => {
       formDataToSend.append('password', formData.password);
       formDataToSend.append('password_confirmation', formData.password_confirmation);
       formDataToSend.append('role', formData.role);
-      
+
       if (formData.role === 'instructeur') {
         formDataToSend.append('bio', formData.bio);
         formDataToSend.append('specialite', formData.specialite);
       }
-      
+
       if (formData.image) {
         formDataToSend.append('image', formData.image);
       }
-      
+
       const response = await axios.post('http://localhost:8000/api/register', formDataToSend, {
         headers: {
           'Content-Type': 'multipart/form-data',
@@ -168,12 +169,14 @@ const Register = () => {
       });
 
       if (response.data) {
-        alert('Registration successful! Please login.');
+        toast.success('Registration successful! Please login.');
         navigate('/login');
+      } else {
+        toast.error('Registration failed. Please try again.');
       }
     } catch (err) {
       console.error('Registration error:', err);
-      
+
       if (err.response?.data?.message) {
         setError(err.response.data.message);
       } else if (err.response?.data?.errors) {
@@ -311,7 +314,7 @@ const Register = () => {
                           accept="image/jpeg,image/png,image/jpg,image/gif"
                           className="hidden"
                         />
-                        
+
                         {/* Styled button to trigger file selection */}
                         <button
                           type="button"
@@ -323,7 +326,7 @@ const Register = () => {
                             {fileName ? 'Change Profile Picture' : 'Upload Profile Picture'}
                           </span>
                         </button>
-                        
+
                         {/* File name display */}
                         {fileName && (
                           <div className="flex items-center space-x-2 text-sm text-neutral-600 pl-2">
@@ -331,15 +334,15 @@ const Register = () => {
                             <span className="truncate max-w-full">{fileName}</span>
                           </div>
                         )}
-                        
+
                         {/* Image preview */}
                         {previewImage && (
                           <div className="flex justify-center mt-2">
                             <div className="relative">
-                              <img 
-                                src={previewImage} 
-                                alt="Profile preview" 
-                                className="h-24 w-24 object-cover rounded-full border-2 border-primary" 
+                              <img
+                                src={previewImage}
+                                alt="Profile preview"
+                                className="h-24 w-24 object-cover rounded-full border-2 border-primary"
                               />
                               <div className="absolute inset-0 rounded-full bg-primary/10 animate-pulse -z-10"></div>
                             </div>
@@ -369,7 +372,7 @@ const Register = () => {
                           required
                         />
                         <FiLock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-neutral-400" />
-                        
+
                         {/* Toggle password visibility button */}
                         <button
                           type="button"
@@ -399,7 +402,7 @@ const Register = () => {
                           required
                         />
                         <FiLock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-neutral-400" />
-                        
+
                         {/* Toggle confirm password visibility button */}
                         <button
                           type="button"
@@ -507,14 +510,14 @@ const Register = () => {
                 )}
 
                 {currentStep === 1 ? (
-                  <button 
-                    type="submit" 
+                  <button
+                    type="submit"
                     className="btn-primary px-8 py-3 rounded-lg font-medium flex items-center justify-center shadow-md hover:shadow-lg transition-all duration-200"
                   >
                     Next Step
                   </button>
                 ) : (
-                  <button 
+                  <button
                     type="submit"
                     className="btn-primary px-8 py-3 rounded-lg font-medium flex items-center justify-center shadow-md hover:shadow-lg transition-all duration-200"
                     disabled={loading}

@@ -100,7 +100,7 @@ const Header = () => {
                       to="/instructor/dashboard"
                       className="text-neutral-800 hover:text-primary font-medium"
                     >
-                      Dashboard
+                      Instructor Dashboard
                     </Link>
                   ) : (
                     <Link
@@ -283,7 +283,7 @@ const Header = () => {
                       className="text-neutral-800 hover:text-primary font-medium px-1 py-2 border-b border-neutral-200"
                       onClick={() => setIsOpen(false)}
                     >
-                      Dashboard
+                      Instructor Dashboard
                     </Link>
                   ) : (
                     <Link

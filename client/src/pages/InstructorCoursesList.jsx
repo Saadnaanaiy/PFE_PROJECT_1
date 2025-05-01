@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { toast } from 'react-toastify';
 import { motion } from 'framer-motion';
 import {
   FiSearch,
@@ -18,6 +19,8 @@ import {
   FiCpu,
   FiBriefcase,
   FiAward,
+  FiTrash2,
+  FiEdit,
 } from 'react-icons/fi';
 import moroccanPattern from '../assets/moroccan-pattern.svg';
 import axios from 'axios';
@@ -102,14 +105,39 @@ const InstructorCoursesList = () => {
     navigate(`/instructor/courses/${courseId}/edit`);
   };
 
+  const handleDeleteCourse = async (e, courseId) => {
+    // Prevent the click from propagating to the parent (which would navigate to edit)
+    e.stopPropagation();
+
+    if (window.confirm('Are you sure you want to delete this course?')) {
+      try {
+        await axios.delete(`/api/instructor/courses/${courseId}`);
+        setCourses((prevCourses) =>
+          prevCourses.filter((course) => course.id !== courseId),
+        );
+        toast.success('Course deleted successfully!');
+      } catch (err) {
+        console.error('Error deleting course:', err);
+        alert('Failed to delete course. Please try again.');
+      }
+    }
+  };
+
   // Function to create a new course
   const handleCreateCourse = () => {
     navigate('/instructor/courses/create');
   };
 
-  // Function to view category details
-  const handleCategoryClick = (categoryId) => {
-    navigate(`/instructor/categories/${categoryId}`);
+  // Function to handle edit button click
+  const handleEditClick = (e, courseId) => {
+    // Prevent the click from propagating to the parent
+    e.stopPropagation();
+    navigate(`/instructor/courses/${courseId}/edit`);
+  };
+
+  // Handle search input change
+  const handleSearchChange = (e) => {
+    setSearchTerm(e.target.value);
   };
 
   // Toggle category filter dropdown
@@ -130,15 +158,21 @@ const InstructorCoursesList = () => {
   // Clear filter handler
   const handleClearFilter = () => {
     setTempSelectedCategory('');
+    setSelectedCategory('');
+    setShowCategoryFilter(false); // Close the dropdown
   };
 
   // Function to filter courses based on search term and selected category
   const getFilteredCourses = () => {
     return courses.filter((course) => {
+      // Enhanced search logic - check title, description, and category
       const matchSearch =
+        searchTerm === '' ||
         course.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        course.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
         course.category.toLowerCase().includes(searchTerm.toLowerCase());
 
+      // Improved category filtering - ensure proper type conversion
       const matchCategory =
         selectedCategory === '' ||
         course.categoryId === parseInt(selectedCategory, 10);
@@ -153,6 +187,19 @@ const InstructorCoursesList = () => {
   const featuredCourses = [...courses]
     .sort((a, b) => b.students - a.students)
     .slice(0, 4);
+
+  // Click handler for category selection
+  const handleCategorySelect = (categoryId) => {
+    setSelectedCategory(categoryId.toString());
+    // Scroll to courses section
+    const coursesSection = document.getElementById('all-courses');
+    if (coursesSection) {
+      window.scrollTo({
+        top: coursesSection.offsetTop - 100,
+        behavior: 'smooth',
+      });
+    }
+  };
 
   return (
     <div className="min-h-screen bg-neutral-50 py-12 relative">
@@ -207,8 +254,8 @@ const InstructorCoursesList = () => {
             <input
               type="text"
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search courses by title or category..."
+              onChange={handleSearchChange}
+              placeholder="Search courses by title, description or category..."
               className="w-full pl-12 pr-4 py-4 rounded-xl border border-neutral-300 focus:ring-2 focus:ring-primary focus:border-transparent shadow-sm"
             />
             <FiSearch className="absolute left-4 top-1/2 transform -translate-y-1/2 text-neutral-400 text-xl" />
@@ -219,6 +266,8 @@ const InstructorCoursesList = () => {
             <button
               onClick={toggleCategoryFilter}
               className="btn-secondary flex items-center justify-center gap-2 px-6 py-4 rounded-xl shadow-sm"
+              aria-expanded={showCategoryFilter}
+              aria-controls="category-filter-dropdown"
             >
               <FiFilter className="text-lg" />
               Filter
@@ -230,7 +279,10 @@ const InstructorCoursesList = () => {
             </button>
 
             {showCategoryFilter && (
-              <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg z-50 border border-neutral-200">
+              <div
+                id="category-filter-dropdown"
+                className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg z-50 border border-neutral-200"
+              >
                 <div className="p-4">
                   <h4 className="font-medium mb-2">Filter by Category</h4>
                   <select
@@ -240,7 +292,7 @@ const InstructorCoursesList = () => {
                   >
                     <option value="">All Categories</option>
                     {categories.map((category) => (
-                      <option key={category.id} value={category.id}>
+                      <option key={category.id} value={category.id.toString()}>
                         {category.nom}
                       </option>
                     ))}
@@ -314,15 +366,7 @@ const InstructorCoursesList = () => {
                       <div
                         key={category.id}
                         className="bg-white p-6 rounded-xl shadow-card hover:shadow-lg transition-all cursor-pointer flex flex-col items-center text-center group"
-                        onClick={() => {
-                          setSelectedCategory(category.id.toString());
-                          window.scrollTo({
-                            top:
-                              document.getElementById('all-courses').offsetTop -
-                              100,
-                            behavior: 'smooth',
-                          });
-                        }}
+                        onClick={() => handleCategorySelect(category.id)}
                       >
                         <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-3">
                           <IconComponent className="text-primary text-xl" />
@@ -372,9 +416,37 @@ const InstructorCoursesList = () => {
                   {featuredCourses.map((course) => (
                     <div
                       key={course.id}
-                      className="bg-white rounded-xl shadow-card overflow-hidden hover:shadow-lg transition-all group cursor-pointer"
+                      className="bg-white rounded-xl shadow-card overflow-hidden hover:shadow-lg transition-all group cursor-pointer relative"
                       onClick={() => handleCourseClick(course.id)}
                     >
+                      {/* Edit button with tooltip */}
+                      <div className="absolute top-2 left-2 z-10 group/edit">
+                        <button
+                          className="bg-white p-2 rounded-full shadow-md hover:bg-gray-100 transition-all duration-200"
+                          onClick={(e) => handleEditClick(e, course.id)}
+                        >
+                          <FiEdit className="h-4 w-4 text-primary" />
+                        </button>
+                        {/* Tooltip */}
+                        <div className="absolute left-0 -bottom-8 w-16 opacity-0 group-hover/edit:opacity-100 transition-opacity duration-200 bg-gray-800 text-white text-xs px-2 py-1 rounded pointer-events-none">
+                          Edit
+                        </div>
+                      </div>
+
+                      {/* Delete button with tooltip */}
+                      <div className="absolute top-2 right-2 z-10 group/delete">
+                        <button
+                          className="bg-red-500 p-2 rounded-full shadow-md hover:bg-red-600 transition-all duration-200"
+                          onClick={(e) => handleDeleteCourse(e, course.id)}
+                        >
+                          <FiTrash2 className="h-4 w-4 text-white" />
+                        </button>
+                        {/* Tooltip */}
+                        <div className="absolute right-0 -bottom-8 w-16 opacity-0 group-hover/delete:opacity-100 transition-opacity duration-200 bg-gray-800 text-white text-xs px-2 py-1 rounded pointer-events-none text-center">
+                          Delete
+                        </div>
+                      </div>
+
                       <div className="h-56 overflow-hidden">
                         <img
                           src={course.image}
@@ -430,7 +502,7 @@ const InstructorCoursesList = () => {
                 <h2 className="text-2xl font-heading font-bold">All Courses</h2>
                 {selectedCategory && (
                   <button
-                    onClick={() => setSelectedCategory('')}
+                    onClick={handleClearFilter}
                     className="flex items-center text-sm text-primary"
                   >
                     <span>Clear Filter</span>
@@ -453,9 +525,37 @@ const InstructorCoursesList = () => {
                       transition={{ duration: 0.5, delay: 0.1 + index * 0.05 }}
                     >
                       <div
-                        className="flex bg-white rounded-xl overflow-hidden shadow-card hover:shadow-lg transition-all group cursor-pointer"
+                        className="flex bg-white rounded-xl overflow-hidden shadow-card hover:shadow-lg transition-all group cursor-pointer relative"
                         onClick={() => handleCourseClick(course.id)}
                       >
+                        {/* Delete button with tooltip */}
+                        <div className="absolute top-2 right-2 z-10 group/delete">
+                          <button
+                            className="bg-red-500 p-2 rounded-full shadow-md hover:bg-red-600 transition-all duration-200"
+                            onClick={(e) => handleDeleteCourse(e, course.id)}
+                          >
+                            <FiTrash2 className="h-4 w-4 text-white" />
+                          </button>
+                          {/* Tooltip */}
+                          <div className="absolute right-0 -bottom-8 w-16 opacity-0 group-hover/delete:opacity-100 transition-opacity duration-200 bg-gray-800 text-white text-xs px-2 py-1 rounded pointer-events-none text-center">
+                            Delete
+                          </div>
+                        </div>
+
+                        {/* Edit button with tooltip */}
+                        <div className="absolute top-2 right-12 z-10 group/edit">
+                          <button
+                            className="bg-white p-2 rounded-full shadow-md hover:bg-gray-100 transition-all duration-200"
+                            onClick={(e) => handleEditClick(e, course.id)}
+                          >
+                            <FiEdit className="h-4 w-4 text-primary" />
+                          </button>
+                          {/* Tooltip */}
+                          <div className="absolute right-0 -bottom-8 w-16 opacity-0 group-hover/edit:opacity-100 transition-opacity duration-200 bg-gray-800 text-white text-xs px-2 py-1 rounded pointer-events-none text-center">
+                            Edit
+                          </div>
+                        </div>
+
                         <div className="w-32 h-32 sm:w-40 sm:h-40 flex-shrink-0 overflow-hidden">
                           <img
                             src={course.image}

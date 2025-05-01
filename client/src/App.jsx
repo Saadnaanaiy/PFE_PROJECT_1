@@ -23,6 +23,8 @@ import InstructorCoursesList from './pages/InstructorCoursesList';
 import CreateCourse from './pages/CreateCourse';
 import CourseEdit from './pages/CourseEdit';
 import AdminDashboard from './pages/AdminDashboard';
+import { ToastContainer } from 'react-toastify';
+
 
 // Define InstructorRoute component
 const InstructorRoute = ({ children }) => {
@@ -69,6 +71,17 @@ function App() {
 
   return (
     <AuthProvider>
+      <ToastContainer
+        position="top-right"
+        autoClose={5000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+      />
       <div className="flex flex-col min-h-screen">
         {!isFullScreenRoute && <Header />}
         <main className={`${isFullScreenRoute ? '' : 'flex-grow'}`}>
@@ -166,15 +179,24 @@ function App() {
               }
             />
 
-            {/* Admin routes */}
             <Route
+              path="/admin/dashboard"
+              element={
+                <ProtectedRoute>
+                  <AdminDashboard />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Admin routes */}
+            {/* <Route
               path="/admin/dashboard"
               element={
                 <AdminRoute>
                   <AdminDashboard />
                 </AdminRoute>
               }
-            />
+            /> */}
             {/* Add additional admin routes here as needed */}
           </Routes>
         </main>

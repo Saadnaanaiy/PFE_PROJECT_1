@@ -13,6 +13,14 @@ import {
   FiChevronLeft,
   FiX,
   FiCheck,
+  FiFilm,
+  FiFileText,
+  FiLock,
+  FiUnlock,
+  FiPlusCircle,
+  FiEdit,
+  FiTrash2,
+  FiRefreshCw,
 } from 'react-icons/fi';
 import moroccanPattern from '../assets/moroccan-pattern.svg';
 import axios from 'axios';
@@ -35,6 +43,13 @@ const CreateCourse = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [currentStep, setCurrentStep] = useState(1);
+
+  // Added for lessons and videos
+  const [currentSectionIndex, setCurrentSectionIndex] = useState(0);
+  const [lessons, setLessons] = useState({});
+  const [videos, setVideos] = useState({});
+  const [selectedLesson, setSelectedLesson] = useState(null);
+  const [videoUploading, setVideoUploading] = useState(false);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -61,6 +76,162 @@ const CreateCourse = () => {
 
   const prevStep = () => {
     setCurrentStep(currentStep - 1);
+  };
+
+  // New methods for lessons
+  const handleAddLesson = (sectionId, lessonData) => {
+    setLessons({
+      ...lessons,
+      [sectionId]: [
+        ...(lessons[sectionId] || []),
+        {
+          ...lessonData,
+          id: Math.random().toString(36).substring(2, 9), // Temporary ID
+          section_id: sectionId,
+        },
+      ],
+    });
+  };
+
+  const handleRemoveLesson = (sectionId, lessonId) => {
+    setLessons({
+      ...lessons,
+      [sectionId]: lessons[sectionId].filter(
+        (lesson) => lesson.id !== lessonId,
+      ),
+    });
+
+    // Clean up any associated videos
+    if (videos[lessonId]) {
+      const newVideos = { ...videos };
+      delete newVideos[lessonId];
+      setVideos(newVideos);
+    }
+  };
+
+  const handleUpdateLesson = (sectionId, lessonId, updatedData) => {
+    setLessons({
+      ...lessons,
+      [sectionId]: lessons[sectionId].map((lesson) =>
+        lesson.id === lessonId ? { ...lesson, ...updatedData } : lesson,
+      ),
+    });
+  };
+
+  // Methods for video management
+  const handleAddVideo = (lessonId, videoData) => {
+    setVideos({
+      ...videos,
+      [lessonId]: videoData,
+    });
+  };
+
+  const handleRemoveVideo = (lessonId) => {
+    const newVideos = { ...videos };
+    delete newVideos[lessonId];
+    setVideos(newVideos);
+  };
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      // Check file size (500MB limit)
+      const maxSize = 500 * 1024 * 1024; // 500MB in bytes
+      if (file.size > maxSize) {
+        setError('Video file size must be less than 500MB');
+        return;
+      }
+
+      setVideoFile(file);
+      setVideoData({
+        ...videoData,
+        titre: file.name,
+      });
+
+      // Get video duration
+      try {
+        const video = document.createElement('video');
+        video.preload = 'metadata';
+        video.onloadedmetadata = () => {
+          const duration = Math.ceil(video.duration / 60); // Convert to minutes
+          setVideoData((prev) => ({
+            ...prev,
+            dureeMinutes: duration,
+          }));
+        };
+        video.src = URL.createObjectURL(file);
+      } catch (error) {
+        console.error('Error getting video duration:', error);
+      }
+    }
+  };
+
+  const handleUpload = async () => {
+    if (!videoFile) return;
+
+    setUploading(true);
+    setError(null);
+
+    try {
+      // Create a chunked upload
+      const chunkSize = 5 * 1024 * 1024; // 5MB chunks
+      const totalChunks = Math.ceil(videoFile.size / chunkSize);
+      let uploadedChunks = 0;
+
+      for (let chunk = 0; chunk < totalChunks; chunk++) {
+        const start = chunk * chunkSize;
+        const end = Math.min(start + chunkSize, videoFile.size);
+        const fileChunk = videoFile.slice(start, end);
+
+        const formData = new FormData();
+        formData.append('chunk', fileChunk);
+        formData.append('chunkNumber', chunk + 1);
+        formData.append('totalChunks', totalChunks);
+        formData.append('fileName', videoFile.name);
+        formData.append('lessonId', lessonId);
+        formData.append('videoData', JSON.stringify(videoData));
+
+        await axios.post('/api/instructor/upload-video-chunk', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+          onUploadProgress: (progressEvent) => {
+            const chunkProgress =
+              (progressEvent.loaded / progressEvent.total) * 100;
+            const totalProgress =
+              ((uploadedChunks + chunkProgress / 100) / totalChunks) * 100;
+            setUploadProgress(totalProgress);
+          },
+        });
+
+        uploadedChunks++;
+      }
+
+      // After all chunks are uploaded, notify the server to combine them
+      const response = await axios.post(
+        '/api/instructor/complete-video-upload',
+        {
+          fileName: videoFile.name,
+          lessonId: lessonId,
+          videoData: videoData,
+        },
+      );
+
+      // Update video metadata
+      handleAddVideo(lessonId, {
+        ...videoData,
+        url: response.data.url,
+        file: videoFile,
+      });
+
+      onVideoUploaded();
+    } catch (error) {
+      console.error('Upload failed:', error);
+      setError(error.response?.data?.message || 'Failed to upload video');
+    } finally {
+      setUploading(false);
+      setUploadProgress(0);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -90,6 +261,41 @@ const CreateCourse = () => {
           Object.keys(section).forEach((key) => {
             courseFormData.append(`sections[${index}][${key}]`, section[key]);
           });
+
+          // Add lessons for this section
+          const sectionLessons = lessons[section.id] || [];
+          sectionLessons.forEach((lesson, lessonIndex) => {
+            Object.keys(lesson).forEach((key) => {
+              if (key !== 'id' && key !== 'file') {
+                // Skip temporary id and file object
+                courseFormData.append(
+                  `sections[${index}][lecons][${lessonIndex}][${key}]`,
+                  lesson[key],
+                );
+              }
+            });
+
+            // Add video if exists for this lesson
+            if (videos[lesson.id]) {
+              const video = videos[lesson.id];
+              Object.keys(video).forEach((key) => {
+                if (key !== 'file') {
+                  courseFormData.append(
+                    `sections[${index}][lecons][${lessonIndex}][video][${key}]`,
+                    video[key],
+                  );
+                }
+              });
+
+              // Add video file if exists
+              if (video.file) {
+                courseFormData.append(
+                  `sections[${index}][lecons][${lessonIndex}][video][file]`,
+                  video.file,
+                );
+              }
+            }
+          });
         });
       }
 
@@ -114,7 +320,7 @@ const CreateCourse = () => {
     return (
       <div className="mb-8">
         <div className="flex items-center justify-center">
-          {[1, 2, 3].map((step) => (
+          {[1, 2, 3, 4, 5].map((step) => (
             <div key={step} className="flex items-center">
               <div
                 className={`relative z-10 flex items-center justify-center w-12 h-12 rounded-full font-medium transition-all duration-300 ${
@@ -132,11 +338,13 @@ const CreateCourse = () => {
                   {step === 1 && 'Category'}
                   {step === 2 && 'Details'}
                   {step === 3 && 'Structure'}
+                  {step === 4 && 'Lessons'}
+                  {step === 5 && 'Videos'}
                 </div>
               </div>
-              {step < 3 && (
+              {step < 5 && (
                 <div
-                  className={`h-1 w-16 md:w-24 transition-all duration-300 ${
+                  className={`h-1 w-12 md:w-20 transition-all duration-300 ${
                     currentStep > step ? 'bg-primary' : 'bg-neutral-200'
                   }`}
                 ></div>
@@ -144,6 +352,353 @@ const CreateCourse = () => {
             </div>
           ))}
         </div>
+      </div>
+    );
+  };
+
+  // Lesson Form Component
+  const LessonForm = ({ sectionId, lesson = null, onSave, onCancel }) => {
+    const [lessonData, setLessonData] = useState({
+      titre: lesson?.titre || '',
+      ordre: lesson?.ordre || (lessons[sectionId]?.length || 0) + 1,
+      estGratuite: lesson?.estGratuite || false,
+    });
+
+    const handleChange = (e) => {
+      const { name, value, type, checked } = e.target;
+      setLessonData({
+        ...lessonData,
+        [name]: type === 'checkbox' ? checked : value,
+      });
+    };
+
+    const handleSubmit = (e) => {
+      e.preventDefault();
+      onSave(lessonData);
+    };
+
+    return (
+      <form
+        onSubmit={handleSubmit}
+        className="bg-neutral-50 p-4 rounded-lg border border-neutral-200 mb-4"
+      >
+        <h4 className="font-medium text-neutral-800 mb-3">
+          {lesson ? 'Edit Lesson' : 'Add New Lesson'}
+        </h4>
+
+        <div className="mb-3">
+          <label
+            htmlFor="titre"
+            className="block text-sm font-medium text-neutral-700 mb-1"
+          >
+            Lesson Title*
+          </label>
+          <input
+            type="text"
+            id="titre"
+            name="titre"
+            value={lessonData.titre}
+            onChange={handleChange}
+            className="w-full px-3 py-2 rounded-lg border border-neutral-300 focus:ring-2 focus:ring-primary focus:border-transparent shadow-sm"
+            required
+          />
+        </div>
+
+        <div className="mb-3">
+          <label
+            htmlFor="ordre"
+            className="block text-sm font-medium text-neutral-700 mb-1"
+          >
+            Order
+          </label>
+          <input
+            type="number"
+            id="ordre"
+            name="ordre"
+            value={lessonData.ordre}
+            onChange={handleChange}
+            className="w-full px-3 py-2 rounded-lg border border-neutral-300 focus:ring-2 focus:ring-primary focus:border-transparent shadow-sm"
+            min="1"
+          />
+        </div>
+
+        <div className="mb-3">
+          <label className="flex items-center text-sm font-medium text-neutral-700">
+            <input
+              type="checkbox"
+              name="estGratuite"
+              checked={lessonData.estGratuite}
+              onChange={handleChange}
+              className="mr-2 h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
+            />
+            Free Preview (available to non-enrolled students)
+          </label>
+        </div>
+
+        <div className="flex justify-end space-x-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="px-4 py-2 text-sm rounded-lg border border-neutral-300 text-neutral-700 hover:bg-neutral-100"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            className="px-4 py-2 text-sm rounded-lg bg-primary text-white hover:bg-primary-dark"
+          >
+            {lesson ? 'Update' : 'Add'} Lesson
+          </button>
+        </div>
+      </form>
+    );
+  };
+
+  // Video Upload Component
+  const VideoUploader = ({
+    lessonId,
+    existingVideo,
+    onVideoUploaded,
+    onRemoveVideo,
+  }) => {
+    const [videoFile, setVideoFile] = useState(null);
+    const [uploading, setUploading] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState(0);
+    const [videoData, setVideoData] = useState({
+      titre: existingVideo?.titre || '',
+      dureeMinutes: existingVideo?.dureeMinutes || '',
+    });
+
+    const handleFileChange = async (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        // Check file size (500MB limit)
+        const maxSize = 500 * 1024 * 1024; // 500MB in bytes
+        if (file.size > maxSize) {
+          setError('Video file size must be less than 500MB');
+          return;
+        }
+
+        setVideoFile(file);
+        setVideoData({
+          ...videoData,
+          titre: file.name,
+        });
+
+        // Get video duration
+        try {
+          const video = document.createElement('video');
+          video.preload = 'metadata';
+          video.onloadedmetadata = () => {
+            const duration = Math.ceil(video.duration / 60); // Convert to minutes
+            setVideoData((prev) => ({
+              ...prev,
+              dureeMinutes: duration,
+            }));
+          };
+          video.src = URL.createObjectURL(file);
+        } catch (error) {
+          console.error('Error getting video duration:', error);
+        }
+      }
+    };
+
+    const handleInputChange = (e) => {
+      const { name, value } = e.target;
+      setVideoData({
+        ...videoData,
+        [name]: value,
+      });
+    };
+
+    const handleUpload = async () => {
+      if (!videoFile) return;
+
+      setUploading(true);
+      setError(null);
+
+      try {
+        // Create a chunked upload
+        const chunkSize = 5 * 1024 * 1024; // 5MB chunks
+        const totalChunks = Math.ceil(videoFile.size / chunkSize);
+        let uploadedChunks = 0;
+
+        for (let chunk = 0; chunk < totalChunks; chunk++) {
+          const start = chunk * chunkSize;
+          const end = Math.min(start + chunkSize, videoFile.size);
+          const fileChunk = videoFile.slice(start, end);
+
+          const formData = new FormData();
+          formData.append('chunk', fileChunk);
+          formData.append('chunkNumber', chunk + 1);
+          formData.append('totalChunks', totalChunks);
+          formData.append('fileName', videoFile.name);
+          formData.append('lessonId', lessonId);
+          formData.append('videoData', JSON.stringify(videoData));
+
+          await axios.post('/api/instructor/upload-video-chunk', formData, {
+            headers: {
+              'Content-Type': 'multipart/form-data',
+            },
+            onUploadProgress: (progressEvent) => {
+              const chunkProgress =
+                (progressEvent.loaded / progressEvent.total) * 100;
+              const totalProgress =
+                ((uploadedChunks + chunkProgress / 100) / totalChunks) * 100;
+              setUploadProgress(totalProgress);
+            },
+          });
+
+          uploadedChunks++;
+        }
+
+        // After all chunks are uploaded, notify the server to combine them
+        const response = await axios.post(
+          '/api/instructor/complete-video-upload',
+          {
+            fileName: videoFile.name,
+            lessonId: lessonId,
+            videoData: videoData,
+          },
+        );
+
+        // Update video metadata
+        handleAddVideo(lessonId, {
+          ...videoData,
+          url: response.data.url,
+          file: videoFile,
+        });
+
+        onVideoUploaded();
+      } catch (error) {
+        console.error('Upload failed:', error);
+        setError(error.response?.data?.message || 'Failed to upload video');
+      } finally {
+        setUploading(false);
+        setUploadProgress(0);
+      }
+    };
+
+    return (
+      <div className="bg-neutral-50 p-4 rounded-lg border border-neutral-200">
+        {existingVideo ? (
+          <div>
+            <div className="flex justify-between items-center mb-3">
+              <h4 className="font-medium text-neutral-800">Uploaded Video</h4>
+              <button
+                onClick={() => onRemoveVideo()}
+                className="text-red-500 hover:text-red-700 text-sm"
+              >
+                <FiTrash2 />
+              </button>
+            </div>
+            <div className="p-3 bg-white rounded-lg border border-neutral-200 flex items-center">
+              <FiFilm className="text-primary mr-2" />
+              <div className="flex-1">
+                <div className="font-medium">{existingVideo.titre}</div>
+                {existingVideo.dureeMinutes && (
+                  <div className="text-sm text-neutral-500">
+                    Duration: {existingVideo.dureeMinutes} min
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div>
+            <h4 className="font-medium text-neutral-800 mb-3">Upload Video</h4>
+
+            {videoFile ? (
+              <div>
+                <div className="p-3 bg-white rounded-lg border border-neutral-200 flex items-center mb-3">
+                  <FiFilm className="text-primary mr-2" />
+                  <div className="flex-1">
+                    <div className="font-medium">{videoFile.name}</div>
+                    <div className="text-sm text-neutral-500">
+                      {(videoFile.size / (1024 * 1024)).toFixed(2)} MB
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setVideoFile(null)}
+                    className="text-neutral-500 hover:text-neutral-700"
+                  >
+                    <FiX />
+                  </button>
+                </div>
+
+                <div className="mt-3">
+                  <label className="block text-sm font-medium text-neutral-700 mb-1">
+                    Video Title
+                  </label>
+                  <input
+                    type="text"
+                    name="titre"
+                    value={videoData.titre}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 rounded-lg border border-neutral-300 focus:ring-2 focus:ring-primary focus:border-transparent shadow-sm"
+                  />
+                </div>
+
+                <div className="mt-3">
+                  <label className="block text-sm font-medium text-neutral-700 mb-1">
+                    Duration (minutes)
+                  </label>
+                  <input
+                    type="number"
+                    name="dureeMinutes"
+                    value={videoData.dureeMinutes}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 rounded-lg border border-neutral-300 focus:ring-2 focus:ring-primary focus:border-transparent shadow-sm"
+                    min="0"
+                    step="0.1"
+                    readOnly
+                  />
+                </div>
+
+                {uploading ? (
+                  <div className="mt-4">
+                    <div className="w-full bg-neutral-200 rounded-full h-2.5">
+                      <div
+                        className="bg-primary h-2.5 rounded-full"
+                        style={{ width: `${uploadProgress}%` }}
+                      ></div>
+                    </div>
+                    <div className="text-sm text-neutral-600 mt-1 text-center">
+                      Uploading... {Math.round(uploadProgress)}%
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={handleUpload}
+                    className="mt-4 w-full px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark flex items-center justify-center"
+                  >
+                    <FiUpload className="mr-2" /> Upload Video
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div
+                onClick={() => document.getElementById('videoFile').click()}
+                className="border-2 border-dashed border-neutral-300 rounded-lg p-8 text-center cursor-pointer hover:border-primary transition-colors"
+              >
+                <FiFilm className="text-3xl text-neutral-400 mx-auto mb-2" />
+                <p className="text-neutral-600 mb-2">
+                  Click to select a video file
+                </p>
+                <p className="text-neutral-500 text-sm">
+                  MP4, WebM or MOV. Max 2GB.
+                </p>
+                <input
+                  id="videoFile"
+                  type="file"
+                  accept="video/mp4,video/webm,video/quicktime"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+              </div>
+            )}
+          </div>
+        )}
       </div>
     );
   };
@@ -390,25 +945,27 @@ const CreateCourse = () => {
                   ) : (
                     <div
                       onClick={() => document.getElementById('image').click()}
-                      className="w-40 h-40 flex flex-col items-center justify-center border-2 border-dashed border-neutral-300 rounded-lg hover:border-primary cursor-pointer bg-neutral-50 transition-colors"
+                      className="w-40 h-40 flex items-center justify-center border-2 border-dashed border-neutral-300 rounded-lg cursor-pointer hover:border-primary transition-colors"
                     >
-                      <FiUpload className="text-3xl text-neutral-400 mb-2" />
-                      <span className="text-sm text-neutral-500 font-medium">
-                        Upload Image
-                      </span>
+                      <div className="text-center">
+                        <FiUpload className="text-2xl text-neutral-400 mx-auto mb-2" />
+                        <span className="text-sm text-neutral-500">
+                          Upload Image
+                        </span>
+                      </div>
                     </div>
                   )}
                   <input
+                    type="file"
                     id="image"
                     name="image"
-                    type="file"
                     accept="image/*"
                     onChange={handleImageChange}
                     className="hidden"
                   />
                 </div>
                 <p className="mt-2 text-sm text-neutral-500">
-                  Recommended: 1280x720px (16:9 ratio), JPEG or PNG
+                  Recommended: 16:9 ratio, at least 1280x720px
                 </p>
               </div>
             </div>
@@ -417,10 +974,10 @@ const CreateCourse = () => {
               <button
                 type="button"
                 onClick={prevStep}
-                className="flex items-center justify-center px-6 py-3 rounded-full border-2 border-neutral-300 text-neutral-700 font-medium hover:bg-neutral-100 transition-all active:translate-y-[1px]"
+                className="flex items-center justify-center px-6 py-2 rounded-lg border border-neutral-300 text-neutral-700 font-medium hover:bg-neutral-50 transition-all"
               >
                 <FiChevronLeft className="mr-2" />
-                Back
+                Previous
               </button>
               <button
                 type="button"
@@ -431,13 +988,13 @@ const CreateCourse = () => {
                   !formData.prix ||
                   !formData.dureeMinutes
                 }
-                className={`flex items-center justify-center px-8 py-3 rounded-full font-medium shadow-md hover:shadow-lg transition-all hover:translate-y-[-1px] active:translate-y-[1px] ${
+                className={`flex items-center justify-center px-8 py-3 rounded-full bg-primary text-white font-medium shadow-md hover:shadow-lg transition-all hover:translate-y-[-1px] active:translate-y-[1px] ${
                   !formData.titre ||
                   !formData.description ||
                   !formData.prix ||
                   !formData.dureeMinutes
-                    ? 'bg-neutral-400 text-white opacity-50 cursor-not-allowed'
-                    : 'bg-primary text-white hover:bg-primary-dark'
+                    ? 'opacity-50 cursor-not-allowed bg-neutral-400'
+                    : 'hover:bg-primary-dark'
                 }`}
               >
                 Next: Course Structure
@@ -447,15 +1004,14 @@ const CreateCourse = () => {
           </motion.div>
         )}
 
-        {/* Step 3: Course Structure (Sections) */}
+        {/* Step 3: Course Structure */}
         {currentStep === 3 && (
-          <motion.form
-            onSubmit={handleSubmit}
+          <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
             transition={{ duration: 0.5 }}
-            className="bg-white rounded-xl shadow-lg p-8"
+            className="bg-white rounded-xl shadow-lg p-8 mb-8"
           >
             <h2 className="text-xl font-semibold mb-6 flex items-center text-neutral-800">
               <span className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary mr-3">
@@ -464,56 +1020,327 @@ const CreateCourse = () => {
               Course Structure
             </h2>
 
-            <div className="border-b border-neutral-200 pb-6 mb-6">
-              <SectionManager sections={sections} setSections={setSections} />
-            </div>
+            <SectionManager sections={sections} setSections={setSections} />
 
             <div className="flex justify-between mt-8">
               <button
                 type="button"
                 onClick={prevStep}
-                className="flex items-center justify-center px-6 py-3 rounded-full border-2 border-neutral-300 text-neutral-700 font-medium hover:bg-neutral-100 transition-all active:translate-y-[1px]"
+                className="flex items-center justify-center px-6 py-2 rounded-lg border border-neutral-300 text-neutral-700 font-medium hover:bg-neutral-50 transition-all"
               >
                 <FiChevronLeft className="mr-2" />
-                Back
+                Previous
               </button>
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => navigate('/instructor/courses')}
-                  className="flex items-center justify-center px-6 py-3 rounded-full border-2 border-neutral-300 text-neutral-700 font-medium hover:bg-neutral-100 transition-all active:translate-y-[1px]"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="flex items-center justify-center px-8 py-3 rounded-full bg-primary text-white font-medium shadow-md hover:shadow-lg transition-all hover:translate-y-[-1px] active:translate-y-[1px] disabled:bg-primary/70 disabled:cursor-not-allowed"
-                >
-                  {loading ? (
-                    <>
-                      <div className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                      Creating...
-                    </>
-                  ) : (
-                    <>
-                      <FiCheck className="mr-2" />
-                      Create Course
-                    </>
-                  )}
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={nextStep}
+                disabled={sections.length === 0}
+                className={`flex items-center justify-center px-8 py-3 rounded-full bg-primary text-white font-medium shadow-md hover:shadow-lg transition-all hover:translate-y-[-1px] active:translate-y-[1px] ${
+                  sections.length === 0
+                    ? 'opacity-50 cursor-not-allowed bg-neutral-400'
+                    : 'hover:bg-primary-dark'
+                }`}
+              >
+                Next: Add Lessons
+                <FiChevronRight className="ml-2" />
+              </button>
             </div>
+          </motion.div>
+        )}
 
-            <div className="mt-8 p-4 bg-blue-50 rounded-lg border border-blue-100 shadow-sm">
-              <p className="text-sm text-blue-800">
-                <strong>Note:</strong> You can add content to your sections
-                after creating the course.
-                {sections.length === 0 &&
-                  " You haven't added any sections yet, but you can still create your course and add sections later."}
-              </p>
+        {/* Step 4: Lessons */}
+        {currentStep === 4 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.5 }}
+            className="bg-white rounded-xl shadow-lg p-8 mb-8"
+          >
+            <h2 className="text-xl font-semibold mb-6 flex items-center text-neutral-800">
+              <span className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary mr-3">
+                4
+              </span>
+              Add Lessons
+            </h2>
+
+            {sections.length > 0 ? (
+              <div>
+                <div className="mb-6 flex items-center">
+                  <div className="mr-4 font-medium text-neutral-600">
+                    Section:
+                  </div>
+                  <div className="flex space-x-2">
+                    {sections.map((section, index) => (
+                      <button
+                        key={section.id}
+                        onClick={() => setCurrentSectionIndex(index)}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                          currentSectionIndex === index
+                            ? 'bg-primary text-white'
+                            : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
+                        }`}
+                      >
+                        {section.titre}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="bg-neutral-50 p-6 rounded-lg border border-neutral-200 mb-6">
+                  <h3 className="text-lg font-medium mb-4">
+                    {sections[currentSectionIndex].titre}
+                  </h3>
+
+                  {/* Display existing lessons */}
+                  {lessons[sections[currentSectionIndex].id]?.length > 0 ? (
+                    <div className="mb-4 space-y-2">
+                      {lessons[sections[currentSectionIndex].id].map(
+                        (lesson) => (
+                          <div
+                            key={lesson.id}
+                            className="bg-white p-4 rounded-lg border border-neutral-200 shadow-sm flex items-center justify-between hover:border-primary transition-all"
+                          >
+                            <div className="flex items-center">
+                              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-neutral-100 text-neutral-700 mr-3 text-sm font-medium">
+                                {lesson.ordre}
+                              </div>
+                              <div>
+                                <h4 className="font-medium text-neutral-800">
+                                  {lesson.titre}
+                                </h4>
+                                <div className="text-sm text-neutral-500 flex items-center mt-1">
+                                  {lesson.estGratuite ? (
+                                    <span className="flex items-center text-green-600">
+                                      <FiUnlock className="mr-1" /> Free Preview
+                                    </span>
+                                  ) : (
+                                    <span className="flex items-center">
+                                      <FiLock className="mr-1" /> Premium
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <button
+                                onClick={() => setSelectedLesson(lesson)}
+                                className="p-2 text-neutral-600 hover:text-primary rounded-full hover:bg-neutral-100"
+                              >
+                                <FiEdit />
+                              </button>
+                              <button
+                                onClick={() =>
+                                  handleRemoveLesson(
+                                    sections[currentSectionIndex].id,
+                                    lesson.id,
+                                  )
+                                }
+                                className="p-2 text-neutral-600 hover:text-red-500 rounded-full hover:bg-neutral-100"
+                              >
+                                <FiTrash2 />
+                              </button>
+                            </div>
+                          </div>
+                        ),
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-neutral-500">
+                      No lessons added yet. Add your first lesson below.
+                    </div>
+                  )}
+
+                  {/* Add lesson form */}
+                  {selectedLesson ? (
+                    <LessonForm
+                      sectionId={sections[currentSectionIndex].id}
+                      lesson={selectedLesson}
+                      onSave={(lessonData) => {
+                        handleUpdateLesson(
+                          sections[currentSectionIndex].id,
+                          selectedLesson.id,
+                          lessonData,
+                        );
+                        setSelectedLesson(null);
+                      }}
+                      onCancel={() => setSelectedLesson(null)}
+                    />
+                  ) : (
+                    <button
+                      onClick={() =>
+                        handleAddLesson(sections[currentSectionIndex].id, {
+                          titre: '',
+                          ordre:
+                            (lessons[sections[currentSectionIndex].id]
+                              ?.length || 0) + 1,
+                          estGratuite: false,
+                        })
+                      }
+                      className="w-full py-3 flex items-center justify-center text-primary border-2 border-dashed border-primary/30 rounded-lg hover:bg-primary/5 transition-colors"
+                    >
+                      <FiPlusCircle className="mr-2" /> Add New Lesson
+                    </button>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-12 text-neutral-500">
+                Please add course sections in the previous step first.
+              </div>
+            )}
+
+            <div className="flex justify-between mt-8">
+              <button
+                type="button"
+                onClick={prevStep}
+                className="flex items-center justify-center px-6 py-2 rounded-lg border border-neutral-300 text-neutral-700 font-medium hover:bg-neutral-50 transition-all"
+              >
+                <FiChevronLeft className="mr-2" />
+                Previous
+              </button>
+              <button
+                type="button"
+                onClick={nextStep}
+                className="flex items-center justify-center px-8 py-3 rounded-full bg-primary text-white font-medium shadow-md hover:shadow-lg transition-all hover:translate-y-[-1px] active:translate-y-[1px] hover:bg-primary-dark"
+              >
+                Next: Add Videos
+                <FiChevronRight className="ml-2" />
+              </button>
             </div>
-          </motion.form>
+          </motion.div>
+        )}
+
+        {/* Step 5: Videos */}
+        {currentStep === 5 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.5 }}
+            className="bg-white rounded-xl shadow-lg p-8 mb-8"
+          >
+            <h2 className="text-xl font-semibold mb-6 flex items-center text-neutral-800">
+              <span className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary mr-3">
+                5
+              </span>
+              Add Videos
+            </h2>
+
+            {sections.length > 0 &&
+            Object.values(lessons).some(
+              (sectionLessons) => sectionLessons.length > 0,
+            ) ? (
+              <div>
+                <div className="mb-6">
+                  <p className="text-neutral-600 mb-4">
+                    Select a lesson to add video content.
+                  </p>
+
+                  {sections.map((section) => {
+                    // Only show sections that have lessons
+                    const sectionLessons = lessons[section.id] || [];
+                    if (sectionLessons.length === 0) return null;
+
+                    return (
+                      <div key={section.id} className="mb-6">
+                        <h3 className="font-medium text-neutral-700 mb-2">
+                          {section.titre}
+                        </h3>
+                        <div className="space-y-2 pl-4 border-l-2 border-neutral-200">
+                          {sectionLessons.map((lesson) => (
+                            <button
+                              key={lesson.id}
+                              onClick={() => setSelectedLesson(lesson)}
+                              className={`w-full text-left px-4 py-2 rounded-lg flex items-center justify-between ${
+                                selectedLesson?.id === lesson.id
+                                  ? 'bg-primary text-white'
+                                  : 'bg-white border border-neutral-200 text-neutral-700 hover:border-primary'
+                              }`}
+                            >
+                              <div className="flex items-center">
+                                <div
+                                  className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium mr-2 ${
+                                    selectedLesson?.id === lesson.id
+                                      ? 'bg-white text-primary'
+                                      : 'bg-neutral-100 text-neutral-700'
+                                  }`}
+                                >
+                                  {lesson.ordre}
+                                </div>
+                                {lesson.titre}
+                              </div>
+                              {videos[lesson.id] && (
+                                <FiFilm
+                                  className={`${
+                                    selectedLesson?.id === lesson.id
+                                      ? 'text-white'
+                                      : 'text-primary'
+                                  }`}
+                                />
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {selectedLesson && (
+                  <div className="bg-neutral-50 p-6 rounded-lg border border-neutral-200">
+                    <h3 className="text-lg font-medium mb-4 flex items-center">
+                      <FiFileText className="mr-2 text-primary" />
+                      Add Video to: {selectedLesson.titre}
+                    </h3>
+
+                    <VideoUploader
+                      lessonId={selectedLesson.id}
+                      existingVideo={videos[selectedLesson.id]}
+                      onVideoUploaded={() => {
+                        // Maybe update UI state here
+                      }}
+                      onRemoveVideo={() => handleRemoveVideo(selectedLesson.id)}
+                    />
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-12 text-neutral-500">
+                Please add lessons in the previous step first.
+              </div>
+            )}
+
+            <div className="flex justify-between mt-8">
+              <button
+                type="button"
+                onClick={prevStep}
+                className="flex items-center justify-center px-6 py-2 rounded-lg border border-neutral-300 text-neutral-700 font-medium hover:bg-neutral-50 transition-all"
+              >
+                <FiChevronLeft className="mr-2" />
+                Previous
+              </button>
+              <button
+                type="submit"
+                onClick={handleSubmit}
+                disabled={loading}
+                className={`flex items-center justify-center px-8 py-3 rounded-full bg-primary text-white font-medium shadow-md hover:shadow-lg transition-all hover:translate-y-[-1px] active:translate-y-[1px] ${
+                  loading
+                    ? 'opacity-70 cursor-not-allowed'
+                    : 'hover:bg-primary-dark'
+                }`}
+              >
+                {loading ? (
+                  <>
+                    <FiRefreshCw className="mr-2 animate-spin" /> Creating
+                    Course...
+                  </>
+                ) : (
+                  <>Create Course</>
+                )}
+              </button>
+            </div>
+          </motion.div>
         )}
       </div>
     </div>

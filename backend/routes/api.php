@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AdminController;
 use App\Http\Controllers\CoursController;
 use App\Http\Controllers\InstructorCourseController;
 use App\Http\Controllers\InstructorLessonController;
@@ -53,6 +54,11 @@ Route::middleware('auth:sanctum')->prefix('instructor')->group(function () {
     Route::put('/courses/{courseId}/sections/{sectionId}', [InstructorCourseController::class, 'updateSection']);
     Route::delete('/courses/{courseId}/sections/{sectionId}', [InstructorCourseController::class, 'destroySection']);
     Route::put('/courses/{courseId}/sections/reorder', [InstructorCourseController::class, 'reorderSections']);
+
+
+    // Lesson routes (commented out for now)
+    Route::post('/courses/{courseId}/sections/{sectionId}/lessons', [InstructorCourseController::class, 'storeLecon']);
+
 });
 
 // Lesson routes (commented out for now)
@@ -65,28 +71,33 @@ Route::middleware('auth:sanctum')->prefix('instructor')->group(function () {
 // });
 
 // Admin-specific routes
-// Route::middleware(['auth:sanctum'])->prefix('admin')->group(function () {
-//     // Dashboard statistics
-//     Route::get('/dashboard', [AdministrateurController::class, 'getDashboardStats']);
+Route::middleware(['auth:sanctum'])->prefix('admin')->group(function () {
+    // Dashboard statistics
+    Route::get("/dashboard", [AdminController::class, 'getStudents']);
 
-//     // User management
-//     Route::get('/users', [AdministrateurController::class, 'getAllUsers']);
-//     Route::get('/users/role/{role}', [AdministrateurController::class, 'getUsersByRole']);
-//     Route::get('/users/{id}', [AdministrateurController::class, 'getUser']);
-//     Route::post('/users', [AdministrateurController::class, 'createUser']);
-//     Route::put('/users/{id}', [AdministrateurController::class, 'updateUser']);
-//     Route::delete('/users/{id}', [AdministrateurController::class, 'deleteUser']);
+    // Route::get('/dashboard', [AdministrateurController::class, 'getDashboardStats']);
 
-//     // Course management
-//     Route::get('/courses', [AdministrateurController::class, 'getAllCourses']);
-//     Route::get('/courses/{id}', [AdministrateurController::class, 'getCourse']);
-//     Route::put('/courses/{id}/status', [AdministrateurController::class, 'updateCourseStatus']);
-//     Route::delete('/courses/{id}', [AdministrateurController::class, 'deleteCourse']);
+    // // User management
+    // Route::get('/users', [AdministrateurController::class, 'getAllUsers']);
+    // Route::get('/users/role/{role}', [AdministrateurController::class, 'getUsersByRole']);
+    // Route::get('/users/{id}', [AdministrateurController::class, 'getUser']);
+    // Route::post('/users', [AdministrateurController::class, 'createUser']);
+    // Route::put('/users/{id}', [AdministrateurController::class, 'updateUser']);
+    // Route::delete('/users/{id}', [AdministrateurController::class, 'deleteUser']);
 
-//     // Category management
-//     Route::get('/categories', [AdministrateurController::class, 'getAllCategories']);
-//     Route::get('/categories/{id}', [AdministrateurController::class, 'getCategory']);
-//     Route::post('/categories', [AdministrateurController::class, 'createCategory']);
-//     Route::put('/categories/{id}', [AdministrateurController::class, 'updateCategory']);
-//     Route::delete('/categories/{id}', [AdministrateurController::class, 'deleteCategory']);
-// });
+    // // Course management
+    // Route::get('/courses', [AdministrateurController::class, 'getAllCourses']);
+    // Route::get('/courses/{id}', [AdministrateurController::class, 'getCourse']);
+    Route::put('/courses/{id}/update', [AdminController::class, 'updateCourse']);
+    Route::delete('/courses/{id}', [AdminController::class, 'deleteCourse']);
+
+    Route::put("/instructors/{id}/update", [AdminController::class, 'updateInstructor']);
+    Route::delete("/instructors/{id}/delete", [AdminController::class, 'deleteInstructor']);
+
+    // // Category management
+    // Route::get('/categories', [AdministrateurController::class, 'getAllCategories']);
+    // Route::get('/categories/{id}', [AdministrateurController::class, 'getCategory']);
+    // Route::post('/categories', [AdministrateurController::class, 'createCategory']);
+    // Route::put('/categories/{id}', [AdministrateurController::class, 'updateCategory']);
+    // Route::delete('/categories/{id}', [AdministrateurController::class, 'deleteCategory']);
+});
