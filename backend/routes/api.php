@@ -16,6 +16,7 @@ Route::post("/login", [UserController::class, "login"]);
 Route::get('/courses', [CoursController::class, 'index']);
 Route::get('/courses/{id}', [CoursController::class, 'show']);
 Route::get('/categories', [CoursController::class, 'getCategories']);
+Route::get('/courses/{id}/forums', [CoursController::class, 'getForums']);
 
 // Protected routes
 Route::middleware('auth:sanctum')->group(function () {
@@ -27,10 +28,16 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get("/instructors/{user}", [UserController::class, "show"]);
     Route::get("/logout", [UserController::class, "logout"]);
 
-    // Cart routes (commented out for now)
-    // Route::post('/courses/{id}/add-to-cart', [CoursController::class, 'addToCart']);
-    // Route::get('/cart', [CoursController::class, 'getCart']);
-    // Route::delete('/cart/{id}', [CoursController::class, 'removeFromCart']);
+    // Forum routes
+    Route::post('/courses/{id}/forums', [CoursController::class, 'createForum']);
+    Route::post('/forums/{forumId}/discussions', [CoursController::class, 'addDiscussion']);
+
+    // Cart routes
+    Route::get('/cart', 'App\Http\Controllers\PanierController@index');
+    Route::post('/cart/add', 'App\Http\Controllers\PanierController@addToCart');
+    Route::delete('/cart/{id}', 'App\Http\Controllers\PanierController@removeFromCart');
+    Route::delete('/cart', 'App\Http\Controllers\PanierController@clearCart');
+    Route::get('/cart/check/{id}', 'App\Http\Controllers\PanierController@checkInCart');
 });
 
 // Instructor-specific routes
@@ -55,10 +62,17 @@ Route::middleware('auth:sanctum')->prefix('instructor')->group(function () {
     Route::delete('/courses/{courseId}/sections/{sectionId}', [InstructorCourseController::class, 'destroySection']);
     Route::put('/courses/{courseId}/sections/reorder', [InstructorCourseController::class, 'reorderSections']);
 
+    // Lesson routes
+    Route::get('/sections/{sectionId}/lessons', [InstructorCourseController::class, 'getLessons']);
+    Route::post('/sections/{sectionId}/lessons', [InstructorCourseController::class, 'storeLecon']);
+    Route::put('/sections/{sectionId}/lessons/{lessonId}', [InstructorCourseController::class, 'updateLecon']);
+    Route::delete('/sections/{sectionId}/lessons/{lessonId}', [InstructorCourseController::class, 'destroyLecon']);
+    Route::post('/lessons/{lessonId}/video', [InstructorCourseController::class, 'storeVideo']);
 
-    // Lesson routes (commented out for now)
-    Route::post('/courses/{courseId}/sections/{sectionId}/lessons', [InstructorCourseController::class, 'storeLecon']);
-
+    // Video upload routes
+    Route::post('/lessons/{lessonId}/video/init', [InstructorCourseController::class, 'initVideoUpload']);
+    Route::post('/lessons/{lessonId}/video/chunk', [InstructorCourseController::class, 'uploadVideoChunk']);
+    Route::post('/lessons/{lessonId}/video/complete', [InstructorCourseController::class, 'completeVideoUpload']);
 });
 
 // Lesson routes (commented out for now)

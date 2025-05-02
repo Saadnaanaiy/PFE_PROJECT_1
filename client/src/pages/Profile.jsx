@@ -31,6 +31,11 @@ const Profile = () => {
 
   // Set appropriate default tab based on user role
   useEffect(() => {
+    console.log('Current user data:', user);
+    console.log('User role:', user?.role);
+    console.log('Is instructor:', isInstructor);
+    console.log('Is student:', isStudent);
+
     if (isInstructor) {
       setActiveTab('instructor');
     } else {
@@ -41,26 +46,39 @@ const Profile = () => {
   // Fetch student enrolled courses if user is a student
   useEffect(() => {
     const fetchEnrolledCourses = async () => {
-      if (isStudent && user.id) {
+      if (isStudent && user?.id) {
+        console.log('Fetching enrolled courses for student...');
         setLoading(true);
         try {
-          const response = await axios.get(
-            `http://localhost:8000/api/student/courses`,
-          );
-          setEnrolledCourses(response.data.courses || []);
+          // First check if the API path is correct - it should match your backend route
+          const response = await axios.get(`/api/student/courses`);
+          console.log('Student courses API response:', response.data);
 
-          // Calculate enrolled courses statistics
-          const courses = response.data.courses || [];
-          const uniqueCategories = new Set(courses.map((c) => c.categorie_id))
-            .size;
+          if (response.data && response.data.courses) {
+            setEnrolledCourses(response.data.courses);
 
-          setStats((prev) => ({
-            ...prev,
-            totalEnrolled: courses.length,
-            categoriesEnrolled: uniqueCategories,
-          }));
+            // Calculate enrolled courses statistics
+            const courses = response.data.courses;
+            const uniqueCategories = new Set(
+              courses.map((c) => c.categorie_id).filter(Boolean),
+            ).size;
+
+            setStats((prev) => ({
+              ...prev,
+              totalEnrolled: courses.length,
+              categoriesEnrolled: uniqueCategories,
+            }));
+            console.log('Updated student stats:', {
+              totalEnrolled: courses.length,
+              categoriesEnrolled: uniqueCategories,
+            });
+          } else {
+            console.log('No courses data found in response:', response.data);
+            setEnrolledCourses([]);
+          }
         } catch (err) {
           console.error('Error fetching enrolled courses:', err);
+          setEnrolledCourses([]);
         } finally {
           setLoading(false);
         }
@@ -73,30 +91,49 @@ const Profile = () => {
   // Fetch instructor details and created courses if user is an instructor
   useEffect(() => {
     const fetchInstructorData = async () => {
-      if (isInstructor && user.id) {
+      if (isInstructor && user?.id) {
+        console.log('Fetching instructor data...');
         setLoading(true);
         try {
           const [instrRes, coursesRes] = await Promise.all([
-            axios.get(`http://localhost:8000/api/instructors/${user.id}`),
-            axios.get(`http://localhost:8000/api/instructor/courses`),
+            axios.get(`/api/instructors/${user.id}`),
+            axios.get(`/api/instructor/courses`),
           ]);
+
+          console.log('Instructor profile API response:', instrRes.data);
+          console.log('Instructor courses API response:', coursesRes.data);
+
           setInstructorDetails(instrRes.data);
-          setCreatedCourses(coursesRes.data.courses || []);
 
-          console.log('Instructor Data:', instrRes.data);
+          if (coursesRes.data && coursesRes.data.courses) {
+            setCreatedCourses(coursesRes.data.courses);
 
-          // Calculate created courses statistics
-          const courses = coursesRes.data.courses || [];
-          const uniqueCategories = new Set(courses.map((c) => c.categorie_id))
-            .size;
+            // Calculate created courses statistics
+            const courses = coursesRes.data.courses;
+            const uniqueCategories = new Set(
+              courses.map((c) => c.categorie_id).filter(Boolean),
+            ).size;
 
-          setStats((prev) => ({
-            ...prev,
-            totalCreated: courses.length,
-            categoriesCreated: uniqueCategories,
-          }));
+            setStats((prev) => ({
+              ...prev,
+              totalCreated: courses.length,
+              categoriesCreated: uniqueCategories,
+            }));
+
+            console.log('Updated instructor stats:', {
+              totalCreated: courses.length,
+              categoriesCreated: uniqueCategories,
+            });
+          } else {
+            console.log(
+              'No created courses found in response:',
+              coursesRes.data,
+            );
+            setCreatedCourses([]);
+          }
         } catch (err) {
           console.error('Error fetching instructor data:', err);
+          setCreatedCourses([]);
         } finally {
           setLoading(false);
         }
@@ -535,18 +572,25 @@ const Profile = () => {
           {/* Sidebar */}
           <aside className="space-y-6">
             <div className="bg-white rounded-xl shadow-card p-6 text-center">
+              {console.log('Rendering profile image with user data:', {
+                userImage: user?.image,
+                userName: user?.nom,
+                userEmail: user?.email,
+                userRole: user?.role,
+              })}
               <div className="w-24 h-24 mx-auto mb-4 bg-neutral-100 rounded-full flex items-center justify-center overflow-hidden">
-                {isInstructor && instructorData?.image ? (
-                  <img
-                    src={instructorData.image}
-                    alt="Profile"
-                    className="w-full h-full object-cover"
-                  />
-                ) : user?.image ? (
+                {user?.image ? (
                   <img
                     src={user.image}
                     alt="Profile"
                     className="w-full h-full object-cover"
+                    onLoad={() => console.log('User image loaded successfully')}
+                    onError={(e) => {
+                      console.error('Error loading user image:', e);
+                      e.target.onerror = null;
+                      e.target.src =
+                        'https://via.placeholder.com/150?text=User';
+                    }}
                   />
                 ) : (
                   <FiUser className="text-primary w-10 h-10" />
@@ -577,7 +621,7 @@ const Profile = () => {
                   </>
                 ) : (
                   <>
-                    {/* <div className="bg-neutral-50 rounded p-2">
+                    <div className="bg-neutral-50 rounded p-2">
                       <p className="text-xs text-neutral-500">Courses</p>
                       <p className="font-semibold">{stats.totalEnrolled}</p>
                     </div>
@@ -586,7 +630,7 @@ const Profile = () => {
                       <p className="font-semibold">
                         {stats.categoriesEnrolled}
                       </p>
-                    </div> */}
+                    </div>
                   </>
                 )}
               </div>

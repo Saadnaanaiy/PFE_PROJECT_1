@@ -11,6 +11,7 @@ class Forum extends Model
 
     protected $fillable = [
         'titre',
+        'description',
         'dateCreation',
         'cours_id'
     ];

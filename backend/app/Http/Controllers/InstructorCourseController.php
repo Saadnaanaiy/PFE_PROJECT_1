@@ -460,33 +460,381 @@ class InstructorCourseController extends Controller
         ]);
     }
 
-    public function storeLecon(Request $request, Section $section)
+    public function storeLecon(Request $request, $sectionId)
     {
-        $data = $request->validate([
-            'titre'      => 'required|string|max:255',
-            'ordre'      => 'nullable|integer',
+        $request->validate([
+            'titre' => 'required|string|max:255',
+            'ordre' => 'nullable|integer|min:0',
             'estGratuite' => 'boolean',
         ]);
 
-        $lecon = $section->lecons()->create([
-            'titre'      => $data['titre'],
-            'ordre'      => $data['ordre'] ?? $section->lecons()->count() + 1,
-            'estGratuite' => $data['estGratuite'] ?? false,
-        ]);
+        $section = Section::findOrFail($sectionId);
 
-        return response()->json($lecon, 201);
+        // Verify instructor owns this section
+        $instructeur = Auth::user()->instructeur;
+        if ($section->cours->instructeur_id !== $instructeur->id) {
+            return response()->json([
+                'message' => 'You do not have permission to add lessons to this section'
+            ], 403);
+        }
+
+        $data = $request->all();
+        $data['section_id'] = $sectionId;
+
+        // If no order provided, place at the end
+        if (!isset($data['ordre'])) {
+            $lastOrder = $section->lecons()->max('ordre') ?? 0;
+            $data['ordre'] = $lastOrder + 1;
+        }
+
+        $lecon = Lecon::create($data);
+
+        return response()->json([
+            'message' => 'Lesson created successfully',
+            'lesson' => $lecon
+        ], 201);
     }
 
-    public function storeVideo(Request $request, Lecon $lecon)
+    public function storeVideo(Request $request, $lessonId)
     {
-        $data = $request->validate([
-            'titre'        => 'required|string|max:255',
-            'url'          => 'required|url',
+        $request->validate([
+            'video' => 'required|file|mimes:mp4,webm,mov|max:500000', // 500MB max
+            'titre' => 'required|string|max:255',
             'dureeMinutes' => 'required|integer|min:1',
         ]);
 
-        $video = $lecon->video()->create($data);
+        $lecon = Lecon::findOrFail($lessonId);
 
-        return response()->json($video, 201);
+        if ($request->hasFile('video')) {
+            $videoFile = $request->file('video');
+
+            // Generate unique filename
+            $filename = uniqid() . '_' . time() . '.' . $videoFile->getClientOriginalExtension();
+            $path = 'uploads/videos/' . $filename;
+
+            // Create directory if it doesn't exist
+            if (!Storage::disk('public')->exists('uploads/videos')) {
+                Storage::disk('public')->makeDirectory('uploads/videos');
+            }
+
+            // Use streams to handle large files
+            $source = fopen($videoFile->getRealPath(), 'rb');
+            $destination = Storage::disk('public')->putStream($path, $source);
+
+            if (is_resource($source)) {
+                fclose($source);
+            }
+
+            if ($destination) {
+                $video = $lecon->video()->create([
+                    'titre' => $request->titre,
+                    'url' => asset('storage/' . $path),
+                    'dureeMinutes' => $request->dureeMinutes,
+                ]);
+
+                return response()->json([
+                    'message' => 'Video uploaded successfully',
+                    'video' => $video
+                ], 201);
+            }
+        }
+
+        return response()->json([
+            'message' => 'No video file provided or upload failed'
+        ], 400);
     }
+
+    public function getLessons($sectionId)
+    {
+        $section = Section::findOrFail($sectionId);
+
+        // Verify instructor owns this section
+        $instructeur = Auth::user()->instructeur;
+        if ($section->cours->instructeur_id !== $instructeur->id) {
+            return response()->json([
+                'message' => 'You do not have permission to view these lessons'
+            ], 403);
+        }
+
+        $lessons = $section->lecons()->with('video')->orderBy('ordre')->get();
+
+        return response()->json([
+            'lessons' => $lessons
+        ]);
+    }
+
+    public function updateLecon(Request $request, $sectionId, $lessonId)
+    {
+        $request->validate([
+            'titre' => 'required|string|max:255',
+            'ordre' => 'nullable|integer|min:0',
+            'estGratuite' => 'boolean',
+        ]);
+
+        $section = Section::findOrFail($sectionId);
+        $lecon = Lecon::where('id', $lessonId)
+            ->where('section_id', $sectionId)
+            ->first();
+
+        if (!$lecon) {
+            return response()->json([
+                'message' => 'Lesson not found or does not belong to this section'
+            ], 404);
+        }
+
+        // Verify instructor owns this section
+        $instructeur = Auth::user()->instructeur;
+        if ($section->cours->instructeur_id !== $instructeur->id) {
+            return response()->json([
+                'message' => 'You do not have permission to update lessons in this section'
+            ], 403);
+        }
+
+        $lecon->update($request->all());
+
+        return response()->json([
+            'message' => 'Lesson updated successfully',
+            'lesson' => $lecon
+        ]);
+    }
+
+    public function destroyLecon($sectionId, $lessonId)
+    {
+        $section = Section::findOrFail($sectionId);
+        $lecon = Lecon::where('id', $lessonId)
+            ->where('section_id', $sectionId)
+            ->first();
+
+        if (!$lecon) {
+            return response()->json([
+                'message' => 'Lesson not found or does not belong to this section'
+            ], 404);
+        }
+
+        // Verify instructor owns this section
+        $instructeur = Auth::user()->instructeur;
+        if ($section->cours->instructeur_id !== $instructeur->id) {
+            return response()->json([
+                'message' => 'You do not have permission to delete lessons from this section'
+            ], 403);
+        }
+
+        // Delete associated video if exists
+        if ($lecon->video) {
+            Storage::disk('public')->delete($lecon->video->url);
+            $lecon->video->delete();
+        }
+
+        $lecon->delete();
+
+        return response()->json([
+            'message' => 'Lesson deleted successfully'
+        ]);
+    }
+
+
+// Add these methods to your InstructorCourseController class
+
+// Initialize video upload
+public function initVideoUpload(Request $request, $lessonId)
+{
+    $request->validate([
+        'filename' => 'required|string',
+        'totalSize' => 'required|integer',
+        'titre' => 'required|string',
+        'dureeMinutes' => 'required|integer',
+    ]);
+
+    $lecon = Lecon::findOrFail($lessonId);
+
+    // Verify instructor owns this lesson
+    $instructeur = Auth::user()->instructeur;
+    if ($lecon->section->cours->instructeur_id !== $instructeur->id) {
+        return response()->json([
+            'message' => 'You do not have permission to upload videos to this lesson'
+        ], 403);
+    }
+
+    // Generate unique upload ID
+    $uploadId = uniqid('upload_', true);
+
+    // Create a temp directory for this upload
+    $uploadDir = storage_path('app/temp/uploads/' . $uploadId);
+    if (!file_exists($uploadDir)) {
+        mkdir($uploadDir, 0777, true);
+    }
+
+    // Store upload info in a JSON file
+    $uploadInfo = [
+        'lessonId' => $lessonId,
+        'filename' => $request->filename,
+        'totalSize' => $request->totalSize,
+        'titre' => $request->titre,
+        'dureeMinutes' => $request->dureeMinutes,
+        'uploadedChunks' => 0,
+        'completed' => false,
+    ];
+
+    file_put_contents($uploadDir . '/info.json', json_encode($uploadInfo));
+
+    return response()->json([
+        'uploadId' => $uploadId,
+        'message' => 'Upload initialized successfully'
+    ]);
+}
+
+// Handle chunk upload
+public function uploadVideoChunk(Request $request, $lessonId)
+{
+    $request->validate([
+        'uploadId' => 'required|string',
+        'chunkIndex' => 'required|integer',
+        'totalChunks' => 'required|integer',
+        'chunk' => 'required|file',
+    ]);
+
+    $uploadId = $request->uploadId;
+    $chunkIndex = $request->chunkIndex;
+
+    // Verify upload exists
+    $uploadDir = storage_path('app/temp/uploads/' . $uploadId);
+    if (!file_exists($uploadDir) || !file_exists($uploadDir . '/info.json')) {
+        return response()->json([
+            'message' => 'Upload not found or expired'
+        ], 404);
+    }
+
+    // Get upload info
+    $uploadInfo = json_decode(file_get_contents($uploadDir . '/info.json'), true);
+
+    // Verify this lesson belongs to the instructor
+    $lecon = Lecon::findOrFail($lessonId);
+    $instructeur = Auth::user()->instructeur;
+    if ($lecon->section->cours->instructeur_id !== $instructeur->id) {
+        return response()->json([
+            'message' => 'You do not have permission to upload videos to this lesson'
+        ], 403);
+    }
+
+    // Save the chunk
+    $chunkFile = $uploadDir . '/chunk_' . $chunkIndex;
+    $request->file('chunk')->move(dirname($chunkFile), basename($chunkFile));
+
+    // Update upload info
+    $uploadInfo['uploadedChunks']++;
+    file_put_contents($uploadDir . '/info.json', json_encode($uploadInfo));
+
+    return response()->json([
+        'message' => 'Chunk uploaded successfully',
+        'chunkIndex' => $chunkIndex,
+        'uploadedChunks' => $uploadInfo['uploadedChunks']
+    ]);
+}
+
+// Complete video upload
+public function completeVideoUpload(Request $request, $lessonId)
+{
+    try {
+        $request->validate([
+            'uploadId' => 'required|string',
+            'filename' => 'required|string',
+        ]);
+
+        $uploadId = $request->uploadId;
+
+        // Verify upload exists
+        $uploadDir = storage_path('app/temp/uploads/' . $uploadId);
+        if (!file_exists($uploadDir) || !file_exists($uploadDir . '/info.json')) {
+            return response()->json([
+                'message' => 'Upload not found or expired'
+            ], 404);
+        }
+
+        // Get upload info
+        $uploadInfo = json_decode(file_get_contents($uploadDir . '/info.json'), true);
+
+        // Verify this lesson belongs to the instructor
+        $lecon = Lecon::findOrFail($lessonId);
+        $instructeur = Auth::user()->instructeur;
+        if ($lecon->section->cours->instructeur_id !== $instructeur->id) {
+            return response()->json([
+                'message' => 'You do not have permission to upload videos to this lesson'
+            ], 403);
+        }
+
+        // Create final video directory: storage/app/public/uploads/{lessonId}/
+        $finalPath = 'uploads/' . $lessonId;
+        $finalDir = storage_path('app/public/' . $finalPath);
+        if (!file_exists($finalDir)) {
+            mkdir($finalDir, 0777, true);
+        }
+
+        // Generate final filename
+        $finalFilename = time() . '_' . pathinfo($uploadInfo['filename'], PATHINFO_FILENAME) . '.mp4';
+        $finalFile = $finalDir . '/' . $finalFilename;
+        $publicPath = $finalPath . '/' . $finalFilename;
+
+        // Get all chunk files
+        $chunkFiles = glob($uploadDir . '/chunk_*');
+        if (empty($chunkFiles)) {
+            throw new \Exception('No chunk files found');
+        }
+
+        // Sort chunks numerically
+        $uploadDirCopy = $uploadDir; // Create a copy for the closure
+        usort($chunkFiles, function ($a, $b) use ($uploadDirCopy) {
+            return (int)str_replace($uploadDirCopy . '/chunk_', '', $a) -
+                   (int)str_replace($uploadDirCopy . '/chunk_', '', $b);
+        });
+
+        // Merge chunks
+        $outFile = fopen($finalFile, 'wb');
+        if (!$outFile) {
+            throw new \Exception('Could not create final video file');
+        }
+
+        foreach ($chunkFiles as $chunk) {
+            $inFile = fopen($chunk, 'rb');
+            if (!$inFile) {
+                fclose($outFile);
+                throw new \Exception('Could not read chunk file: ' . $chunk);
+            }
+            while ($buffer = fread($inFile, 4096)) {
+                fwrite($outFile, $buffer);
+            }
+            fclose($inFile);
+        }
+        fclose($outFile);
+
+        // Create or update video record
+        $video = $lecon->video()->updateOrCreate(
+            ['lecon_id' => $lessonId],
+            [
+                'titre' => $uploadInfo['titre'],
+                'url' => asset('storage/' . $publicPath),
+                'dureeMinutes' => $uploadInfo['dureeMinutes'],
+            ]
+        );
+
+        // Clean up temp files
+        array_map('unlink', glob($uploadDir . '/*'));
+        rmdir($uploadDir);
+
+        return response()->json([
+            'message' => 'Video uploaded successfully',
+            'video' => [
+                'id' => $video->id,
+                'titre' => $video->titre,
+                'dureeMinutes' => $video->dureeMinutes,
+                'url' => $video->url,
+            ]
+        ]);
+
+    } catch (\Exception $e) {
+        \Log::error('Video upload failed: ' . $e->getMessage());
+        return response()->json([
+            'message' => 'Failed to complete video upload: ' . $e->getMessage()
+        ], 500);
+    }
+}
 }

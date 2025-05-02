@@ -1,104 +1,168 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { FiFilter, FiSearch, FiGrid, FiList } from 'react-icons/fi';
+import { FiFilter, FiSearch, FiGrid, FiList, FiClock } from 'react-icons/fi';
 import CourseCard from '../components/CourseCard';
 import moroccanPattern from '../assets/moroccan-pattern.svg';
+import axios from 'axios';
+
+const getLevelColor = (niveau) => {
+  switch (niveau?.toLowerCase()) {
+    case 'débutant':
+      return 'bg-green-100 text-green-800';
+    case 'intermédiaire':
+      return 'bg-blue-100 text-blue-800';
+    case 'avancé':
+      return 'bg-purple-100 text-purple-800';
+    default:
+      return 'bg-gray-100 text-gray-800';
+  }
+};
+
+// Function to fix duplicate URL prefixes in image paths
+const fixImagePath = (imagePath) => {
+  if (!imagePath) return '';
+
+  // Remove duplicate "http://localhost:8000/storage/" prefix
+  const storagePrefix = 'http://localhost:8000/storage/';
+  if (imagePath.includes(storagePrefix + storagePrefix)) {
+    return imagePath.replace(storagePrefix + storagePrefix, storagePrefix);
+  }
+  return imagePath;
+};
 
 const CoursesList = () => {
   const [viewMode, setViewMode] = useState('grid');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterOpen, setFilterOpen] = useState(false);
+  const [courses, setCourses] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Mock data - would come from API in real app
-  const courses = [
-    {
-      id: '1',
-      title: 'Complete Web Development Bootcamp',
-      instructor: 'Dr. Mohammed Bennani',
-      price: 199,
-      originalPrice: 899,
-      rating: 4.8,
-      reviewsCount: 320,
-      studentsCount: 5430,
-      image:
-        'https://images.pexels.com/photos/1181298/pexels-photo-1181298.jpeg?auto=compress&cs=tinysrgb&w=600',
-      category: 'Development',
-    },
-    {
-      id: '2',
-      title: 'Arabic Calligraphy Masterclass',
-      instructor: 'Fatima Zahra',
-      price: 149,
-      originalPrice: 499,
-      rating: 4.9,
-      reviewsCount: 187,
-      studentsCount: 2340,
-      image:
-        'https://images.pexels.com/photos/6238297/pexels-photo-6238297.jpeg?auto=compress&cs=tinysrgb&w=600',
-      category: 'Arts',
-    },
-    {
-      id: '3',
-      title: 'Moroccan Cuisine: From Tagine to Couscous',
-      instructor: 'Chef Karim Alaoui',
-      price: 129,
-      originalPrice: 299,
-      rating: 4.7,
-      reviewsCount: 256,
-      studentsCount: 3120,
-      image:
-        'https://images.pexels.com/photos/7437656/pexels-photo-7437656.jpeg?auto=compress&cs=tinysrgb&w=600',
-      category: 'Cooking',
-    },
-    {
-      id: '4',
-      title: 'Darija for Beginners: Moroccan Arabic',
-      instructor: 'Leila Amrani',
-      price: 89,
-      originalPrice: 199,
-      rating: 4.6,
-      reviewsCount: 145,
-      studentsCount: 1870,
-      image:
-        'https://images.pexels.com/photos/6150432/pexels-photo-6150432.jpeg?auto=compress&cs=tinysrgb&w=600',
-      category: 'Languages',
-    },
-    {
-      id: '5',
-      title: 'Modern Digital Marketing for Businesses',
-      instructor: 'Hassan Benjelloun',
-      price: 179,
-      originalPrice: 599,
-      rating: 4.7,
-      reviewsCount: 210,
-      studentsCount: 2750,
-      image:
-        'https://images.pexels.com/photos/4348404/pexels-photo-4348404.jpeg?auto=compress&cs=tinysrgb&w=600',
-      category: 'Marketing',
-    },
-    {
-      id: '6',
-      title: 'Introduction to Data Science and AI',
-      instructor: 'Dr. Amina Tazi',
-      price: 229,
-      originalPrice: 799,
-      rating: 4.8,
-      reviewsCount: 189,
-      studentsCount: 2160,
-      image:
-        'https://images.pexels.com/photos/5926382/pexels-photo-5926382.jpeg?auto=compress&cs=tinysrgb&w=600',
-      category: 'Data Science',
-    },
-  ];
+  // Filter states
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [selectedPrice, setSelectedPrice] = useState('');
+  const [selectedRating, setSelectedRating] = useState('');
+  const [selectedSort, setSelectedSort] = useState('popular');
 
-  // Filter courses based on search term
-  const filteredCourses = courses.filter(
-    (course) =>
-      course.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      course.instructor.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      course.category.toLowerCase().includes(searchTerm.toLowerCase()),
-  );
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const [coursesRes, categoriesRes] = await Promise.all([
+          axios.get('/api/courses'),
+          axios.get('/api/categories'),
+        ]);
+        const coursesData = coursesRes.data.data.data.map((course) => {
+          // Add dureeHeures (hours) property using the French naming convention to match CourseCard
+          return {
+            ...course,
+            dureeHeures: (course.dureeMinutes / 60).toFixed(1), // Convert minutes to hours with 1 decimal place
+          };
+        });
+        setCourses(coursesData);
+        setCategories(categoriesRes.data.data);
+
+        console.log('courses', coursesData);
+        console.log('categories', categoriesRes.data.data);
+        setError(null);
+      } catch (err) {
+        setError('Failed to fetch courses. Please try again later.');
+        console.error('Error fetching data:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  // Filter courses based on all criteria
+  const filteredCourses = courses.filter((course) => {
+    // Search term filter
+    const matchesSearch =
+      course.titre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      course.instructeur?.user?.nom
+        .toLowerCase()
+        .includes(searchTerm.toLowerCase()) ||
+      course.categorie?.nom.toLowerCase().includes(searchTerm.toLowerCase());
+
+    // Category filter
+    const matchesCategory =
+      !selectedCategory || course.categorie_id === parseInt(selectedCategory);
+
+    // Price filter
+    let matchesPrice = true;
+    if (selectedPrice) {
+      switch (selectedPrice) {
+        case 'free':
+          matchesPrice = course.prix === 0;
+          break;
+        case 'paid':
+          matchesPrice = course.prix > 0;
+          break;
+        case 'under-100':
+          matchesPrice = course.prix < 100;
+          break;
+        case '100-200':
+          matchesPrice = course.prix >= 100 && course.prix <= 200;
+          break;
+        case 'over-200':
+          matchesPrice = course.prix > 200;
+          break;
+      }
+    }
+
+    // Rating filter
+    const matchesRating =
+      !selectedRating || course.rating >= parseFloat(selectedRating);
+
+    return matchesSearch && matchesCategory && matchesPrice && matchesRating;
+  });
+
+  // Sort courses
+  const sortedCourses = [...filteredCourses].sort((a, b) => {
+    switch (selectedSort) {
+      case 'newest':
+        return new Date(b.dateCreation) - new Date(a.dateCreation);
+      case 'price-low':
+        return a.prix - b.prix;
+      case 'price-high':
+        return b.prix - a.prix;
+      case 'rating':
+        return b.rating - a.rating;
+      default: // 'popular'
+        return b.etudiants_count - a.etudiants_count;
+    }
+  });
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-neutral-600">Loading courses...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-500 mb-4">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="btn-primary px-6 py-2"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-neutral-50 py-12 relative">
@@ -189,15 +253,17 @@ const CoursesList = () => {
                   <label className="block text-sm font-medium text-neutral-700 mb-2">
                     Category
                   </label>
-                  <select className="w-full px-3 py-2 rounded-md border border-neutral-300 focus:ring-2 focus:ring-primary focus:border-transparent">
+                  <select
+                    className="w-full px-3 py-2 rounded-md border border-neutral-300 focus:ring-2 focus:ring-primary focus:border-transparent"
+                    value={selectedCategory}
+                    onChange={(e) => setSelectedCategory(e.target.value)}
+                  >
                     <option value="">All Categories</option>
-                    <option value="development">Development</option>
-                    <option value="business">Business</option>
-                    <option value="arts">Arts</option>
-                    <option value="cooking">Cooking</option>
-                    <option value="languages">Languages</option>
-                    <option value="marketing">Marketing</option>
-                    <option value="data-science">Data Science</option>
+                    {categories.map((category) => (
+                      <option key={category.id} value={category.id}>
+                        {category.nom}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
@@ -206,7 +272,11 @@ const CoursesList = () => {
                   <label className="block text-sm font-medium text-neutral-700 mb-2">
                     Price
                   </label>
-                  <select className="w-full px-3 py-2 rounded-md border border-neutral-300 focus:ring-2 focus:ring-primary focus:border-transparent">
+                  <select
+                    className="w-full px-3 py-2 rounded-md border border-neutral-300 focus:ring-2 focus:ring-primary focus:border-transparent"
+                    value={selectedPrice}
+                    onChange={(e) => setSelectedPrice(e.target.value)}
+                  >
                     <option value="">All Prices</option>
                     <option value="free">Free</option>
                     <option value="paid">Paid</option>
@@ -221,7 +291,11 @@ const CoursesList = () => {
                   <label className="block text-sm font-medium text-neutral-700 mb-2">
                     Rating
                   </label>
-                  <select className="w-full px-3 py-2 rounded-md border border-neutral-300 focus:ring-2 focus:ring-primary focus:border-transparent">
+                  <select
+                    className="w-full px-3 py-2 rounded-md border border-neutral-300 focus:ring-2 focus:ring-primary focus:border-transparent"
+                    value={selectedRating}
+                    onChange={(e) => setSelectedRating(e.target.value)}
+                  >
                     <option value="">All Ratings</option>
                     <option value="4.5">4.5 & Up</option>
                     <option value="4.0">4.0 & Up</option>
@@ -235,7 +309,11 @@ const CoursesList = () => {
                   <label className="block text-sm font-medium text-neutral-700 mb-2">
                     Sort By
                   </label>
-                  <select className="w-full px-3 py-2 rounded-md border border-neutral-300 focus:ring-2 focus:ring-primary focus:border-transparent">
+                  <select
+                    className="w-full px-3 py-2 rounded-md border border-neutral-300 focus:ring-2 focus:ring-primary focus:border-transparent"
+                    value={selectedSort}
+                    onChange={(e) => setSelectedSort(e.target.value)}
+                  >
                     <option value="popular">Most Popular</option>
                     <option value="newest">Newest</option>
                     <option value="price-low">Price: Low to High</option>
@@ -251,8 +329,7 @@ const CoursesList = () => {
         {/* Results Count */}
         <div className="mb-6 flex justify-between items-center">
           <p className="text-neutral-600">
-            Showing{' '}
-            <span className="font-medium">{filteredCourses.length}</span>{' '}
+            Showing <span className="font-medium">{sortedCourses.length}</span>{' '}
             results
           </p>
         </div>
@@ -260,21 +337,21 @@ const CoursesList = () => {
         {/* Courses Grid */}
         {viewMode === 'grid' ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredCourses.map((course) => (
+            {sortedCourses.map((course) => (
               <CourseCard key={course.id} course={course} />
             ))}
           </div>
         ) : (
           <div className="space-y-4">
-            {filteredCourses.map((course) => (
+            {sortedCourses.map((course) => (
               <div
                 key={course.id}
                 className="bg-white rounded-xl shadow-card overflow-hidden flex flex-col md:flex-row"
               >
                 <div className="md:w-1/3 h-48 md:h-auto relative">
                   <img
-                    src={course.image}
-                    alt={course.title}
+                    src={fixImagePath(course.image)}
+                    alt={course.titre}
                     className="w-full h-full object-cover"
                   />
                 </div>
@@ -282,34 +359,57 @@ const CoursesList = () => {
                   <div className="flex justify-between items-start">
                     <div>
                       <h3 className="text-xl font-semibold mb-2">
-                        {course.title}
+                        {course.titre}
                       </h3>
-                      <p className="text-neutral-600 mb-1">
-                        By {course.instructor}
-                      </p>
+                      <div className="flex items-center gap-2 mb-1">
+                        {course.instructeur?.image ? (
+                          <img
+                            src={fixImagePath(course.instructeur.image)}
+                            alt={course.instructeur.user?.nom}
+                            className="w-8 h-8 rounded-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                            <span className="text-primary font-medium">
+                              {course.instructeur?.user?.nom?.charAt(0) || 'I'}
+                            </span>
+                          </div>
+                        )}
+                        <p className="text-neutral-600">
+                          By {course.instructeur?.user?.nom}
+                        </p>
+                      </div>
                       <div className="flex items-center text-sm text-neutral-500 mb-4">
-                        <span className="text-yellow-500 mr-1">★</span>
-                        <span className="font-medium mr-1">
-                          {course.rating}
+                        <span>{course.etudiants_count} students</span>
+                        <span className="mx-1.5 text-neutral-300">•</span>
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-xs font-medium ${getLevelColor(
+                            course.niveau,
+                          )}`}
+                        >
+                          {course.niveau}
                         </span>
-                        <span className="mr-3">
-                          ({course.reviewsCount} reviews)
+                        <span className="mx-1.5 text-neutral-300">•</span>
+                        <span className="flex items-center">
+                          <FiClock className="mr-1" />
+                          {course.dureeHeures} hours
                         </span>
-                        <span>{course.studentsCount} students</span>
                       </div>
                     </div>
                     <div className="text-right">
                       <div className="text-2xl font-bold text-secondary">
-                        {course.price} MAD
+                        {course.prix} MAD
                       </div>
-                      <div className="text-sm line-through text-neutral-500">
-                        {course.originalPrice} MAD
-                      </div>
+                      {course.prix_original && (
+                        <div className="text-sm line-through text-neutral-500">
+                          {course.prix_original} MAD
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="flex justify-between items-center mt-4">
                     <span className="inline-block px-3 py-1 bg-primary/10 text-primary rounded-full text-sm">
-                      {course.category}
+                      {course.categorie?.nom}
                     </span>
                     <Link
                       to={`/course/${course.id}`}
@@ -325,7 +425,7 @@ const CoursesList = () => {
         )}
 
         {/* No Results */}
-        {filteredCourses.length === 0 && (
+        {sortedCourses.length === 0 && (
           <div className="text-center py-12">
             <h3 className="text-xl font-medium mb-2">No courses found</h3>
             <p className="text-neutral-600 mb-6">
@@ -334,6 +434,10 @@ const CoursesList = () => {
             <button
               onClick={() => {
                 setSearchTerm('');
+                setSelectedCategory('');
+                setSelectedPrice('');
+                setSelectedRating('');
+                setSelectedSort('popular');
                 setFilterOpen(false);
               }}
               className="btn-primary px-6 py-2"

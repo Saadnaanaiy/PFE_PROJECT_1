@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   FiSearch,
@@ -12,12 +12,14 @@ import {
 import { FaGraduationCap, FaShieldAlt } from 'react-icons/fa';
 import Logo from './Logo';
 import { useAuth } from '../contexts/AuthContext';
+import { getCartItems } from '../services/cartService';
 
 const Header = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
-  const { user, isAuthenticated, logout, isInstructor, isAdmin } = useAuth();
+  const [cartItemsCount, setCartItemsCount] = useState(0);
+  const { user, isAuthenticated, logout, isInstructor, isAdmin, cartUpdateFlag } = useAuth();
   const navigate = useNavigate();
 
   // Handle scroll effect
@@ -26,6 +28,25 @@ const Header = () => {
       setIsScrolled(window.scrollY > 20);
     });
   }
+
+  // Fetch cart items count when component mounts, authentication changes, or cart is updated
+  useEffect(() => {
+    const fetchCartCount = async () => {
+      if (isAuthenticated() && !isInstructor() && !isAdmin()) {
+        try {
+          const items = await getCartItems();
+          setCartItemsCount(items.length);
+        } catch (error) {
+          console.error('Error fetching cart count:', error);
+          setCartItemsCount(0);
+        }
+      } else {
+        setCartItemsCount(0);
+      }
+    };
+
+    fetchCartCount();
+  }, [isAuthenticated, isInstructor, isAdmin, cartUpdateFlag]);
 
   const handleLogout = async () => {
     await logout();
@@ -121,9 +142,11 @@ const Header = () => {
                   {!isInstructor() && !isAdmin() && (
                     <Link to="/cart" className="relative">
                       <FiShoppingCart className="w-6 h-6 text-neutral-800 hover:text-primary" />
-                      <span className="absolute -top-1 -right-1 bg-secondary text-white text-xs font-bold rounded-full h-4 w-4 flex items-center justify-center">
-                        2
-                      </span>
+                      {cartItemsCount > 0 && (
+                        <span className="absolute -top-1 -right-1 bg-secondary text-white text-xs font-bold rounded-full h-4 w-4 flex items-center justify-center">
+                          {cartItemsCount}
+                        </span>
+                      )}
                     </Link>
                   )}
                   {/* Profile Menu */}
@@ -210,12 +233,14 @@ const Header = () => {
 
           {/* Mobile menu button */}
           <div className="flex items-center md:hidden">
-            {isAuthenticated() && !isAdmin() && (
+            {isAuthenticated() && !isAdmin() && !isInstructor() && (
               <Link to="/cart" className="relative mr-4">
                 <FiShoppingCart className="w-6 h-6 text-neutral-800" />
-                <span className="absolute -top-1 -right-1 bg-secondary text-white text-xs font-bold rounded-full h-4 w-4 flex items-center justify-center">
-                  2
-                </span>
+                {cartItemsCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-secondary text-white text-xs font-bold rounded-full h-4 w-4 flex items-center justify-center">
+                    {cartItemsCount}
+                  </span>
+                )}
               </Link>
             )}
             <button
@@ -299,6 +324,16 @@ const Header = () => {
 
               {isAuthenticated() ? (
                 <>
+                  {/* Cart Link for Mobile */}
+                  {!isInstructor() && !isAdmin() && (
+                    <Link
+                      to="/cart"
+                      className="text-neutral-800 hover:text-primary font-medium px-1 py-2 border-b border-neutral-200"
+                      onClick={() => setIsOpen(false)}
+                    >
+                      Cart {cartItemsCount > 0 && `(${cartItemsCount})`}
+                    </Link>
+                  )}
                   {/* Profile Link */}
                   <Link
                     to="/profile"

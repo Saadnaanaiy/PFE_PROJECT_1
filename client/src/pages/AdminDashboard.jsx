@@ -582,26 +582,47 @@ function AdminDashboard() {
 
   if (loading) {
     return (
-      <div className="container mx-auto py-16 text-center">
-        <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent"></div>
-        <p className="mt-4 text-neutral-600">Loading dashboard data...</p>
+      <div className="min-h-screen bg-neutral-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent"></div>
+          <p className="mt-4 text-neutral-600">Loading dashboard data...</p>
+        </div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="container mx-auto py-16 text-center">
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-          <strong className="font-bold">Error!</strong>
-          <span className="block sm:inline"> {error}</span>
+      <div className="min-h-screen bg-neutral-50 flex items-center justify-center">
+        <div className="max-w-md w-full mx-auto p-6">
+          <div className="bg-white rounded-xl shadow-lg p-6 text-center">
+            <div className="text-red-500 mb-4">
+              <svg
+                className="w-16 h-16 mx-auto"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                />
+              </svg>
+            </div>
+            <h3 className="text-xl font-semibold text-neutral-800 mb-2">
+              Error Loading Dashboard
+            </h3>
+            <p className="text-neutral-600 mb-4">{error}</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="bg-primary text-white px-6 py-2 rounded-lg hover:bg-primary-dark transition-colors"
+            >
+              Try Again
+            </button>
+          </div>
         </div>
-        <button
-          onClick={() => window.location.reload()}
-          className="mt-4 bg-primary text-white px-4 py-2 rounded hover:bg-primary-dark"
-        >
-          Reload Page
-        </button>
       </div>
     );
   }
@@ -609,22 +630,22 @@ function AdminDashboard() {
   const stats = [
     {
       title: 'Students',
-      count: dashboardData.etudiants.length,
+      count: dashboardData.etudiants?.length || 0,
       icon: <FiUsers size={24} className="text-blue-500" />,
     },
     {
       title: 'Instructors',
-      count: dashboardData.instructeurs.length,
+      count: dashboardData.instructeurs?.length || 0,
       icon: <FiUser size={24} className="text-green-500" />,
     },
     {
       title: 'Courses',
-      count: dashboardData.courses.length,
+      count: dashboardData.courses?.length || 0,
       icon: <FiBook size={24} className="text-purple-500" />,
     },
     {
       title: 'Categories',
-      count: dashboardData.categories.length,
+      count: dashboardData.categories?.length || 0,
       icon: <FiStar size={24} className="text-yellow-500" />,
     },
   ];
@@ -694,8 +715,32 @@ function AdminDashboard() {
               <div className="flex space-x-2">
                 <button
                   onClick={() => handleDownload('pdf')}
-                  disabled={isDownloading}
-                  className="flex items-center px-3 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition"
+                  disabled={
+                    isDownloading ||
+                    !getFilteredData(
+                      dashboardData[
+                        activeTab === 'students'
+                          ? 'etudiants'
+                          : activeTab === 'instructors'
+                          ? 'instructeurs'
+                          : 'courses'
+                      ],
+                    ).length
+                  }
+                  className={`flex items-center px-3 py-2 rounded transition ${
+                    isDownloading ||
+                    !getFilteredData(
+                      dashboardData[
+                        activeTab === 'students'
+                          ? 'etudiants'
+                          : activeTab === 'instructors'
+                          ? 'instructeurs'
+                          : 'courses'
+                      ],
+                    ).length
+                      ? 'bg-gray-400 cursor-not-allowed'
+                      : 'bg-red-600 hover:bg-red-700 text-white'
+                  }`}
                 >
                   {isDownloading && downloadType === 'pdf' ? (
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
@@ -706,8 +751,32 @@ function AdminDashboard() {
                 </button>
                 <button
                   onClick={() => handleDownload('excel')}
-                  disabled={isDownloading}
-                  className="flex items-center px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition"
+                  disabled={
+                    isDownloading ||
+                    !getFilteredData(
+                      dashboardData[
+                        activeTab === 'students'
+                          ? 'etudiants'
+                          : activeTab === 'instructors'
+                          ? 'instructeurs'
+                          : 'courses'
+                      ],
+                    ).length
+                  }
+                  className={`flex items-center px-3 py-2 rounded transition ${
+                    isDownloading ||
+                    !getFilteredData(
+                      dashboardData[
+                        activeTab === 'students'
+                          ? 'etudiants'
+                          : activeTab === 'instructors'
+                          ? 'instructeurs'
+                          : 'courses'
+                      ],
+                    ).length
+                      ? 'bg-gray-400 cursor-not-allowed'
+                      : 'bg-green-600 hover:bg-green-700 text-white'
+                  }`}
                 >
                   {isDownloading && downloadType === 'excel' ? (
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
@@ -998,13 +1067,20 @@ function StudentTable({ data, formatDate }) {
           </tr>
         </thead>
         <tbody className="divide-y divide-neutral-200">
-          {data.length === 0 ? (
+          {!data || data.length === 0 ? (
             <tr>
-              <td
-                colSpan="4"
-                className="px-6 py-12 text-center text-neutral-500"
-              >
-                No students found
+              <td colSpan="4" className="px-6 py-12">
+                <div className="text-center">
+                  <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-neutral-100 mb-4">
+                    <FiUsers className="w-8 h-8 text-neutral-400" />
+                  </div>
+                  <h3 className="text-lg font-medium text-neutral-900 mb-1">
+                    No Students Found
+                  </h3>
+                  <p className="text-neutral-500">
+                    There are no students in the system yet.
+                  </p>
+                </div>
               </td>
             </tr>
           ) : (
@@ -1013,7 +1089,7 @@ function StudentTable({ data, formatDate }) {
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-800">
                   <img
                     className="w-16 h-16 rounded-full object-cover"
-                    src={student.image}
+                    src={student.image || 'https://via.placeholder.com/150'}
                     alt=""
                   />
                 </td>
@@ -1069,13 +1145,20 @@ function CourseTable({
           </tr>
         </thead>
         <tbody className="divide-y divide-neutral-200">
-          {data.length === 0 ? (
+          {!data || data.length === 0 ? (
             <tr>
-              <td
-                colSpan="7"
-                className="px-6 py-12 text-center text-neutral-500"
-              >
-                No courses found
+              <td colSpan="7" className="px-6 py-12">
+                <div className="text-center">
+                  <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-neutral-100 mb-4">
+                    <FiBook className="w-8 h-8 text-neutral-400" />
+                  </div>
+                  <h3 className="text-lg font-medium text-neutral-900 mb-1">
+                    No Courses Found
+                  </h3>
+                  <p className="text-neutral-500">
+                    There are no courses in the system yet.
+                  </p>
+                </div>
               </td>
             </tr>
           ) : (

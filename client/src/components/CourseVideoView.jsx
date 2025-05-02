@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import PropTypes from 'prop-types';
+import axios from 'axios';
 import {
   FiChevronLeft,
   FiCheck,
@@ -22,16 +23,26 @@ import {
 } from 'react-icons/fi';
 import VideoPlayer from './VideoPlayer';
 
-import laravelVideo from '../assets/laravel.mp4';
-
 // Moroccan color palette
 const moroccanColors = {
-  primary: '#E63946',      // Vibrant red
-  secondary: '#2A9D8F',    // Teal
-  tertiary: '#F4A261',     // Sandy orange
-  accent1: '#E9C46A',      // Gold
-  accent2: '#264653',      // Deep blue
-  accent3: '#5F4B8B',      // Royal purple
+  primary: '#E63946', // Vibrant red
+  secondary: '#2A9D8F', // Teal
+  tertiary: '#F4A261', // Sandy orange
+  accent1: '#E9C46A', // Gold
+  accent2: '#264653', // Deep blue
+  accent3: '#5F4B8B', // Royal purple
+};
+
+// Function to fix duplicate URL prefixes in image paths
+const fixImagePath = (imagePath) => {
+  if (!imagePath) return '';
+
+  // Remove duplicate "http://localhost:8000/storage/" prefix
+  const storagePrefix = 'http://localhost:8000/storage/';
+  if (imagePath.includes(storagePrefix + storagePrefix)) {
+    return imagePath.replace(storagePrefix + storagePrefix, storagePrefix);
+  }
+  return imagePath;
 };
 
 const CourseVideoView = ({ onBack }) => {
@@ -44,133 +55,83 @@ const CourseVideoView = ({ onBack }) => {
   const [activeTab, setActiveTab] = useState('content');
   const [course, setCourse] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   // Fetch course data
   useEffect(() => {
-    // In a real app, this would be an API call using the courseId
-    // For demo purposes, we'll use mock data
     const fetchCourse = async () => {
       setLoading(true);
       try {
-        // Simulate API call
-        setTimeout(() => {
-          setCourse({
-            id: courseId,
-            title: 'Complete Web Development Bootcamp',
-            instructor: 'Dr. Mohammed Bennani',
-            image:
-              'https://images.pexels.com/photos/1181298/pexels-photo-1181298.jpeg?auto=compress&cs=tinysrgb&w=600',
-            rating: 4.8,
-            reviewCount: 247,
-            duration: '22 hours',
-            level: 'Beginner',
-            curriculum: [
-              {
-                title: 'Introduction to Web Development',
-                totalDuration: '45:00',
-                color: moroccanColors.primary,
-                lessons: [
-                  {
-                    title: 'Course Overview',
-                    duration: '10:00',
-                    preview: true,
-                  },
-                  {
-                    title: 'Setting Up Your Development Environment',
-                    duration: '15:00',
-                    preview: false,
-                  },
-                  {
-                    title: 'Understanding Web Technologies',
-                    duration: '20:00',
-                    preview: false,
-                  },
-                ],
-              },
-              {
-                title: 'HTML5 Fundamentals',
-                totalDuration: '1:15:00',
-                color: moroccanColors.secondary,
-                lessons: [
-                  {
-                    title: 'HTML Document Structure',
-                    duration: '25:00',
-                    preview: true,
-                  },
-                  {
-                    title: 'Working with Text and Links',
-                    duration: '20:00',
-                    preview: false,
-                  },
-                  {
-                    title: 'Forms and Input Elements',
-                    duration: '30:00',
-                    preview: false,
-                  },
-                ],
-              },
-              {
-                title: 'CSS3 Styling',
-                totalDuration: '2:30:00',
-                color: moroccanColors.tertiary,
-                lessons: [
-                  {
-                    title: 'CSS Selectors and Properties',
-                    duration: '30:00',
-                    preview: true,
-                  },
-                  {
-                    title: 'Box Model and Layout Techniques',
-                    duration: '40:00',
-                    preview: false,
-                  },
-                  {
-                    title: 'Responsive Design with Media Queries',
-                    duration: '45:00',
-                    preview: false,
-                  },
-                  {
-                    title: 'CSS Animations and Transitions',
-                    duration: '35:00',
-                    preview: false,
-                  },
-                ],
-              },
-              {
-                title: 'JavaScript Essentials',
-                totalDuration: '3:20:00',
-                color: moroccanColors.accent1,
-                lessons: [
-                  {
-                    title: 'JavaScript Syntax Basics',
-                    duration: '40:00',
-                    preview: false,
-                  },
-                  {
-                    title: 'Working with DOM',
-                    duration: '50:00',
-                    preview: false,
-                  },
-                  {
-                    title: 'Event Handling',
-                    duration: '35:00',
-                    preview: false,
-                  },
-                  { title: 'ES6+ Features', duration: '45:00', preview: false },
-                  {
-                    title: 'Asynchronous JavaScript',
-                    duration: '30:00',
-                    preview: false,
-                  },
-                ],
-              },
-            ],
-          });
-          setLoading(false);
-        }, 1000);
-      } catch (error) {
-        console.error('Error fetching course:', error);
+        const response = await axios.get(`/api/courses/${courseId}`);
+        const courseData = response.data.data;
+        console.log('Course data:', courseData);
+
+        // Transform the data to fit our component needs
+        const transformedCourse = {
+          id: courseData.id,
+          title: courseData.titre,
+          instructor: courseData.instructeur?.user?.nom || 'Unknown Instructor',
+          image: fixImagePath(courseData.image),
+          rating: courseData.rating || 0,
+          reviewCount: courseData.reviews_count || 0,
+          duration: `${Math.round(courseData.dureeMinutes / 60)} hours`,
+          level: courseData.niveau || 'Beginner',
+          curriculum: [],
+        };
+
+        // Transform sections and lessons
+        if (courseData.sections && courseData.sections.length > 0) {
+          // Add color to each section for styling
+          const colors = [
+            moroccanColors.primary,
+            moroccanColors.secondary,
+            moroccanColors.tertiary,
+            moroccanColors.accent1,
+            moroccanColors.accent2,
+            moroccanColors.accent3,
+          ];
+
+          transformedCourse.curriculum = courseData.sections.map(
+            (section, index) => {
+              // Calculate total duration of section
+              const totalMinutes =
+                section.lecons?.reduce(
+                  (total, lesson) => total + (lesson.video?.dureeMinutes || 0),
+                  0,
+                ) || 0;
+
+              // Format total duration as HH:MM
+              const hours = Math.floor(totalMinutes / 60);
+              const minutes = totalMinutes % 60;
+              const totalDuration = `${hours > 0 ? hours + ':' : ''}${minutes
+                .toString()
+                .padStart(2, '0')}${hours > 0 ? '' : ':00'}`;
+
+              return {
+                id: section.id,
+                title: section.titre,
+                totalDuration: totalDuration,
+                color: colors[index % colors.length],
+                lessons:
+                  section.lecons?.map((lesson) => ({
+                    id: lesson.id,
+                    title: lesson.titre,
+                    duration: `${lesson.video?.dureeMinutes || 0}:00`,
+                    preview: lesson.estGratuite || false,
+                    videoUrl: fixImagePath(lesson.video?.url || ''),
+                  })) || [],
+              };
+            },
+          );
+        }
+
+        setCourse(transformedCourse);
+        setError(null);
+      } catch (err) {
+        console.error('Error fetching course:', err);
+        setError('Failed to load course data. Please try again later.');
+      } finally {
         setLoading(false);
       }
     };
@@ -187,8 +148,9 @@ const CourseVideoView = ({ onBack }) => {
 
   // Get active video URL
   const getActiveVideo = () => {
-    // Use the imported Laravel video instead of the sample URL
-    return laravelVideo;
+    const activeSection = course?.curriculum?.[activeSectionIndex];
+    const activeLesson = activeSection?.lessons?.[activeLessonIndex];
+    return activeLesson?.videoUrl || '';
   };
 
   const getActiveLesson = () => {
@@ -328,7 +290,7 @@ const CourseVideoView = ({ onBack }) => {
     );
   }
 
-  if (!course) {
+  if (error) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-orange-50 to-red-50">
         <div className="text-center p-8 max-w-md bg-white rounded-xl shadow-lg relative overflow-hidden">
@@ -344,11 +306,43 @@ const CourseVideoView = ({ onBack }) => {
               />
             </div>
             <h2 className="text-2xl font-bold text-neutral-800 mb-3">
-              Course Not Found
+              Error Loading Course
+            </h2>
+            <p className="text-neutral-600 mb-6">{error}</p>
+            <button
+              onClick={onBack}
+              className="px-6 py-2 text-white rounded-md hover:shadow-lg transition-all"
+              style={{ background: moroccanStyles.buttonGradient }}
+            >
+              Go Back
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!course || !course.curriculum || course.curriculum.length === 0) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-orange-50 to-red-50">
+        <div className="text-center p-8 max-w-md bg-white rounded-xl shadow-lg relative overflow-hidden">
+          <div className="absolute inset-0" style={moroccanStyles.notes}></div>
+          <div className="relative z-10">
+            <div
+              className="w-16 h-16 mx-auto mb-5 rounded-full flex items-center justify-center"
+              style={{ backgroundColor: `${moroccanColors.primary}20` }}
+            >
+              <FiBook
+                className="text-2xl"
+                style={{ color: moroccanColors.primary }}
+              />
+            </div>
+            <h2 className="text-2xl font-bold text-neutral-800 mb-3">
+              No Content Available
             </h2>
             <p className="text-neutral-600 mb-6">
-              We couldn&apos;t find the course you&apos;re looking for. It may
-              have been removed or the link is incorrect.
+              This course doesn&apos;t have any content yet. Please check back
+              later.
             </p>
             <button
               onClick={onBack}

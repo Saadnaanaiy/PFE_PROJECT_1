@@ -10,9 +10,10 @@ class Discussion extends Model
     use HasFactory;
 
     protected $fillable = [
-        'sujet',
+        'contenu',
         'dateCreation',
-        'forum_id'
+        'forum_id',
+        'user_id'
     ];
 
     protected $casts = [
@@ -22,6 +23,11 @@ class Discussion extends Model
     public function forum()
     {
         return $this->belongsTo(Forum::class);
+    }
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
     }
 
     public function messages()

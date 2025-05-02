@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
@@ -7,7 +7,6 @@ import {
   FiBook,
   FiAward,
   FiStar,
-  FiGlobe,
   FiDownload,
   FiMessageSquare,
   FiPlus,
@@ -16,6 +15,7 @@ import {
   FiLock,
 } from 'react-icons/fi';
 import zelijBackground from '../assets/zelijBack.png';
+import axios from 'axios';
 
 const CourseDetails = () => {
   const { courseId } = useParams();
@@ -27,6 +27,106 @@ const CourseDetails = () => {
   const [newMessage, setNewMessage] = useState('');
   const [activeForumId, setActiveForumId] = useState(null);
   const [expandedSections, setExpandedSections] = useState({});
+  const [course, setCourse] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [userRole, setUserRole] = useState(null); // 'instructeur', 'etudiant', or null
+  const [isCourseFree, setIsCourseFree] = useState(false);
+
+  // Fetch course details and check user role
+  useEffect(() => {
+    const fetchCourseDetails = async () => {
+      try {
+        setLoading(true);
+        const response = await axios.get(`/api/courses/${courseId}`);
+        setCourse(response.data.data);
+        console.log('Course details:', response.data.data);
+
+        // Check if course is free (all lessons are free)
+        checkIfCourseFree(response.data.data);
+
+        // Try to get current user information
+        await checkUserRole();
+
+        setError(null);
+      } catch (err) {
+        console.error('Error fetching course details:', err);
+        setError('Failed to load course details. Please try again later.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCourseDetails();
+  }, [courseId]);
+
+  // Check if all lessons in the course are free
+  const checkIfCourseFree = (courseData) => {
+    if (!courseData || !courseData.sections) {
+      setIsCourseFree(false);
+      return;
+    }
+
+    // If course price is 0, it's free
+    if (courseData.prix === 0) {
+      setIsCourseFree(true);
+      return;
+    }
+
+    // Otherwise check all lessons
+    let allLessonsFree = true;
+
+    // Loop through all sections and their lessons
+    for (const section of courseData.sections) {
+      if (!section.lecons || section.lecons.length === 0) continue;
+
+      for (const lecon of section.lecons) {
+        if (!lecon.estGratuite) {
+          allLessonsFree = false;
+          break;
+        }
+      }
+
+      if (!allLessonsFree) break;
+    }
+
+    setIsCourseFree(allLessonsFree);
+  };
+
+  // Check if the current user is the instructor of this course or a student
+  const checkUserRole = async () => {
+    try {
+      // Get current user data
+      const userResponse = await axios.get('/api/user');
+      console.log('User data:', userResponse.data);
+
+      // Check if we got a valid response
+      if (userResponse.data) {
+        // Extract user data - the response structure might vary
+        const userData = userResponse.data.data || userResponse.data;
+
+        console.log('Raw user data:', userData);
+        console.log('User role from API:', userData.role);
+
+        if (userData.role === 'instructeur') {
+          console.log('Setting user as instructor');
+          setUserRole('instructeur');
+        } else if (userData.role === 'etudiant') {
+          console.log('Setting user as student');
+          setUserRole('etudiant');
+        } else {
+          setUserRole(userData.role);
+        }
+      } else {
+        console.log('No user data in response');
+        setUserRole(null);
+      }
+    } catch (err) {
+      console.error('Error checking user role:', err);
+      // If there's an error or user is not logged in, they can still view the course
+      setUserRole(null);
+    }
+  };
 
   // Toggle section expansion in curriculum
   const toggleSection = (sectionIndex) => {
@@ -36,206 +136,80 @@ const CourseDetails = () => {
     });
   };
 
-  // In a real app, fetch course details based on courseId
-  const course = {
-    id: courseId,
-    title: 'Complete Web Development Bootcamp',
-    instructor: 'Dr. Mohammed Bennani',
-    image:
-      'https://images.pexels.com/photos/1181298/pexels-photo-1181298.jpeg?auto=compress&cs=tinysrgb&w=600',
-    rating: 4.8,
-    reviewCount: 247,
-    duration: '22 hours',
-    level: 'Beginner',
-    price: 899,
-    discountPrice: 199,
-    category: 'Development',
-    language: 'Arabic, English',
-    lastUpdated: 'February 2024',
-    description: `Learn web development from scratch with this comprehensive bootcamp. Perfect for beginners who want to become professional web developers.
-
-This course covers:
-- HTML5, CSS3, and modern JavaScript
-- React.js and Node.js
-- Database design and implementation
-- Real-world project development
-- Deployment and hosting`,
-    requirements: [
-      'Basic computer knowledge',
-      'No prior programming experience needed',
-      'A computer with internet connection',
-      'Enthusiasm to learn!',
-    ],
-    whatYouWillLearn: [
-      'Build responsive websites using HTML5 and CSS3',
-      'Master JavaScript and modern ES6+ features',
-      'Create full-stack applications with React and Node.js',
-      'Work with databases and APIs',
-      'Deploy applications to production',
-      'Best practices and professional development workflows',
-    ],
-    curriculum: [
-      {
-        title: 'Introduction to Web Development',
-        totalDuration: '45:00',
-        lessons: [
-          { title: 'Course Overview', duration: '10:00', preview: true },
-          {
-            title: 'Setting Up Your Development Environment',
-            duration: '15:00',
-            preview: false,
-          },
-          {
-            title: 'Understanding Web Technologies',
-            duration: '20:00',
-            preview: false,
-          },
-        ],
-      },
-      {
-        title: 'HTML5 Fundamentals',
-        totalDuration: '1:15:00',
-        lessons: [
-          {
-            title: 'HTML Document Structure',
-            duration: '25:00',
-            preview: true,
-          },
-          {
-            title: 'Working with Text and Links',
-            duration: '20:00',
-            preview: false,
-          },
-          {
-            title: 'Forms and Input Elements',
-            duration: '30:00',
-            preview: false,
-          },
-        ],
-      },
-      {
-        title: 'CSS3 Styling',
-        totalDuration: '2:30:00',
-        lessons: [
-          {
-            title: 'CSS Selectors and Properties',
-            duration: '30:00',
-            preview: true,
-          },
-          {
-            title: 'Box Model and Layout Techniques',
-            duration: '40:00',
-            preview: false,
-          },
-          {
-            title: 'Responsive Design with Media Queries',
-            duration: '45:00',
-            preview: false,
-          },
-          {
-            title: 'CSS Animations and Transitions',
-            duration: '35:00',
-            preview: false,
-          },
-        ],
-      },
-      {
-        title: 'JavaScript Essentials',
-        totalDuration: '3:20:00',
-        lessons: [
-          {
-            title: 'JavaScript Syntax Basics',
-            duration: '40:00',
-            preview: false,
-          },
-          { title: 'Working with DOM', duration: '50:00', preview: false },
-          { title: 'Event Handling', duration: '35:00', preview: false },
-          { title: 'ES6+ Features', duration: '45:00', preview: false },
-          {
-            title: 'Asynchronous JavaScript',
-            duration: '30:00',
-            preview: false,
-          },
-        ],
-      },
-    ],
-    // Mock forums data
-    forums: [
-      {
-        id: 1,
-        title: 'Help with HTML forms',
-        description: 'I need assistance with creating complex forms in HTML.',
-        createdBy: 'Dr. Mohammed Bennani',
-        createdAt: 'April 15, 2024',
-        messages: [
-          {
-            id: 1,
-            author: 'Dr. Mohammed Bennani',
-            text: 'Welcome to this forum. Please share your specific questions about HTML forms.',
-            timestamp: 'April 15, 2024',
-            isInstructor: true,
-          },
-          {
-            id: 2,
-            author: 'Ahmed Khaled',
-            text: "I'm struggling with form validation. Can you recommend best practices?",
-            timestamp: 'April 16, 2024',
-            isInstructor: false,
-          },
-        ],
-      },
-      {
-        id: 2,
-        title: 'JavaScript Frameworks Discussion',
-        description:
-          "Let's talk about modern JavaScript frameworks and their use cases.",
-        createdBy: 'Dr. Mohammed Bennani',
-        createdAt: 'April 10, 2024',
-        messages: [
-          {
-            id: 1,
-            author: 'Dr. Mohammed Bennani',
-            text: 'What frameworks have you tried? What do you think of React vs Angular?',
-            timestamp: 'April 10, 2024',
-            isInstructor: true,
-          },
-        ],
-      },
-    ],
-    isInstructor: true, // This would be determined by user authentication in a real app
-    enrolled: true, // Mock enrollment status - would come from auth in real app
-  };
-
   const handleEnroll = () => {
-    navigate(`/payment/${courseId}`);
+    if (isCourseFree) {
+      // Navigate to the course learning page if free
+      navigate(`/course/${courseId}/learn`);
+    } else {
+      // Navigate to payment page if not free
+      navigate(`/payment/${courseId}`);
+    }
   };
 
   // Handle creating a new forum
-  const handleCreateForum = () => {
-    // In a real app, this would send an API request
-    console.log('Creating new forum:', { newForumTopic, newForumDescription });
-    setShowNewForumForm(false);
-    setNewForumTopic('');
-    setNewForumDescription('');
+  const handleCreateForum = async () => {
+    if (!newForumTopic || !newForumDescription) return;
+
+    try {
+      // In a real app, you would make an API call to create a new forum
+      await axios.post(`/api/courses/${courseId}/forums`, {
+        titre: newForumTopic,
+        description: newForumDescription,
+        cours_id: courseId,
+      });
+
+      // Refresh course details to show the new forum
+      const response = await axios.get(`/api/courses/${courseId}`);
+      setCourse(response.data.data);
+
+      // Reset form
+      setShowNewForumForm(false);
+      setNewForumTopic('');
+      setNewForumDescription('');
+    } catch (err) {
+      console.error('Error creating forum:', err);
+      alert('Failed to create forum. Please try again.');
+    }
   };
 
   // Handle sending a message in a forum
-  const handleSendMessage = () => {
-    if (!newMessage.trim()) return;
+  const handleSendMessage = async () => {
+    if (!newMessage.trim() || !activeForumId) return;
 
-    // In a real app, this would send an API request
-    console.log('Sending message in forum:', activeForumId, newMessage);
-    setNewMessage('');
+    try {
+      // In a real app, you would make an API call to send a message
+      await axios.post(`/api/forums/${activeForumId}/discussions`, {
+        contenu: newMessage,
+        dateCreation: new Date().toISOString(),
+        forum_id: activeForumId,
+      });
+
+      // Refresh forum data
+      const response = await axios.get(`/api/courses/${courseId}`);
+      setCourse(response.data.data);
+
+      // Reset message field
+      setNewMessage('');
+    } catch (err) {
+      console.error('Error sending message:', err);
+      alert('Failed to send message. Please try again.');
+    }
   };
 
   // Get active forum data
   const getActiveForum = () => {
-    return course.forums.find((forum) => forum.id === activeForumId);
+    return course?.forums?.find((forum) => forum.id === activeForumId);
   };
 
-  // Start viewing course
-  const startCourse = () => {
-    navigate(`/course/${courseId}/learn`);
+  // Format date function
+  const formatDate = (dateString) => {
+    if (!dateString) return 'Unknown date';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
   };
 
   // Zelij background styles with different variations
@@ -275,6 +249,45 @@ This course covers:
     },
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-neutral-600">Loading course details...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-500 mb-4">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="btn-primary px-6 py-2"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!course) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-neutral-600">No course data available.</p>
+        </div>
+      </div>
+    );
+  }
+
+  console.log('Current user role:', userRole);
+
   return (
     <div className="bg-neutral-50 py-12">
       {/* Course Header - First zelij design */}
@@ -289,25 +302,26 @@ This course covers:
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5 }}
               >
-                {course.title}
+                {course.titre}
               </motion.h1>
               <p className="text-white/90 text-lg mb-6">
-                By {course.instructor}
+                By {course.instructeur?.user?.nom}
               </p>
               <div className="flex items-center space-x-6 text-white/80">
                 <div className="flex items-center">
                   <FiStar className="mr-1" />
-                  <span>
-                    {course.rating} ({course.reviewCount} reviews)
-                  </span>
-                </div>
-                <div className="flex items-center">
-                  <FiGlobe className="mr-1" />
-                  <span>{course.language}</span>
+                  <span>{course.rating || 0}</span>
                 </div>
                 <div className="flex items-center">
                   <FiClock className="mr-1" />
-                  <span>{course.duration}</span>
+                  <span>{course.dureeMinutes} minutes</span>
+                </div>
+                <div className="flex items-center">
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-xs font-medium bg-white/20`}
+                  >
+                    {course.niveau}
+                  </span>
                 </div>
               </div>
             </div>
@@ -322,34 +336,25 @@ This course covers:
                 <div className="relative z-10">
                   <img
                     src={course.image}
-                    alt={course.title}
+                    alt={course.titre}
                     className="w-full aspect-video rounded-lg object-cover mb-6"
                   />
                   <div className="flex items-baseline mb-6">
                     <span className="text-3xl font-bold text-secondary">
-                      {course.discountPrice} MAD
+                      {course.prix} MAD
                     </span>
-                    {course.discountPrice && (
+                    {course.prix_original && (
                       <span className="ml-2 text-lg line-through text-neutral-500">
-                        {course.price} MAD
+                        {course.prix_original} MAD
                       </span>
                     )}
                   </div>
-                  {course.enrolled ? (
-                    <button
-                      onClick={startCourse}
-                      className="btn-primary w-full py-4 mb-4"
-                    >
-                      Continue Learning
-                    </button>
-                  ) : (
-                    <button
-                      onClick={handleEnroll}
-                      className="btn-primary w-full py-4 mb-4"
-                    >
-                      Enroll Now
-                    </button>
-                  )}
+                  <button
+                    onClick={handleEnroll}
+                    className="btn-primary w-full py-4 mb-4"
+                  >
+                    {isCourseFree ? 'Go to Course' : 'Enroll Now'}
+                  </button>
                   <ul className="space-y-3 text-sm text-neutral-600">
                     <li className="flex items-center">
                       <FiPlay className="mr-2" />
@@ -383,25 +388,21 @@ This course covers:
             <div className="bg-white rounded-xl shadow-card overflow-hidden">
               <div className="border-b border-neutral-200">
                 <div className="flex overflow-x-auto">
-                  {[
-                    'overview',
-                    'curriculum',
-                    'instructor',
-                    'reviews',
-                    'forum',
-                  ].map((tab) => (
-                    <button
-                      key={tab}
-                      onClick={() => setActiveTab(tab)}
-                      className={`px-6 py-4 text-sm font-medium transition-colors whitespace-nowrap ${
-                        activeTab === tab
-                          ? 'text-primary border-b-2 border-primary'
-                          : 'text-neutral-600 hover:text-primary'
-                      }`}
-                    >
-                      {tab.charAt(0).toUpperCase() + tab.slice(1)}
-                    </button>
-                  ))}
+                  {['overview', 'curriculum', 'instructor', 'forum'].map(
+                    (tab) => (
+                      <button
+                        key={tab}
+                        onClick={() => setActiveTab(tab)}
+                        className={`px-6 py-4 text-sm font-medium transition-colors whitespace-nowrap ${
+                          activeTab === tab
+                            ? 'text-primary border-b-2 border-primary'
+                            : 'text-neutral-600 hover:text-primary'
+                        }`}
+                      >
+                        {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                      </button>
+                    ),
+                  )}
                 </div>
               </div>
 
@@ -422,12 +423,16 @@ This course covers:
                         What You&apos;ll Learn
                       </h3>
                       <div className="grid md:grid-cols-2 gap-4">
-                        {course.whatYouWillLearn.map((item, index) => (
+                        {course.whatYouWillLearn?.map((item, index) => (
                           <div key={index} className="flex items-start">
                             <FiBook className="mt-1 mr-2 text-primary" />
                             <span className="text-neutral-600">{item}</span>
                           </div>
-                        ))}
+                        )) || (
+                          <p className="text-neutral-600">
+                            No learning objectives specified for this course.
+                          </p>
+                        )}
                       </div>
                     </div>
 
@@ -436,9 +441,11 @@ This course covers:
                         Requirements
                       </h3>
                       <ul className="list-disc list-inside space-y-2 text-neutral-600">
-                        {course.requirements.map((req, index) => (
+                        {course.requirements?.map((req, index) => (
                           <li key={index}>{req}</li>
-                        ))}
+                        )) || (
+                          <li>No specific requirements for this course.</li>
+                        )}
                       </ul>
                     </div>
                   </div>
@@ -456,12 +463,12 @@ This course covers:
                       </h3>
                       <div className="mb-4 text-neutral-600">
                         <span className="font-medium">
-                          {course.curriculum.length} sections
+                          {course.sections?.length || 0} sections
                         </span>{' '}
-                        • {course.duration} total length
+                        • {course.dureeMinutes} minutes total length
                       </div>
 
-                      {course.curriculum.map((section, index) => (
+                      {course.sections?.map((section, index) => (
                         <div
                           key={index}
                           className="border border-neutral-200 rounded-lg mb-4 overflow-hidden"
@@ -476,24 +483,24 @@ This course covers:
                                   expandedSections[index] ? 'rotate-180' : ''
                                 }`}
                               />
-                              <span>{section.title}</span>
+                              <span>{section.titre}</span>
                             </div>
                             <span className="text-sm text-neutral-500">
-                              {section.totalDuration}
+                              {section.lecons?.length || 0} lessons
                             </span>
                           </button>
 
                           {expandedSections[index] && (
                             <div className="divide-y divide-neutral-200">
-                              {section.lessons.map((lesson, lessonIndex) => (
+                              {section.lecons?.map((lecon, lessonIndex) => (
                                 <div
                                   key={lessonIndex}
                                   className="p-4 flex justify-between items-center"
                                 >
                                   <div className="flex items-center">
                                     <FiPlay className="mr-3 text-primary" />
-                                    <span>{lesson.title}</span>
-                                    {lesson.preview && (
+                                    <span>{lecon.titre}</span>
+                                    {lecon.estGratuite && (
                                       <span className="ml-2 text-xs bg-primary/10 text-primary px-2 py-1 rounded-md">
                                         Preview
                                       </span>
@@ -501,18 +508,10 @@ This course covers:
                                   </div>
                                   <div className="flex items-center">
                                     <span className="text-sm text-neutral-500 mr-3">
-                                      {lesson.duration}
+                                      {lecon.video?.dureeMinutes || 0} minutes
                                     </span>
-                                    {!lesson.preview && !course.enrolled && (
+                                    {!lecon.estGratuite && (
                                       <FiLock className="text-neutral-400" />
-                                    )}
-                                    {course.enrolled && (
-                                      <button
-                                        onClick={startCourse}
-                                        className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-md hover:bg-primary/20"
-                                      >
-                                        Watch
-                                      </button>
                                     )}
                                   </div>
                                 </div>
@@ -521,6 +520,38 @@ This course covers:
                           )}
                         </div>
                       ))}
+                    </div>
+                  </div>
+                )}
+
+                {activeTab === 'instructor' && (
+                  <div className="space-y-6">
+                    <div className="flex items-start">
+                      <div className="mr-4">
+                        {course.instructeur?.image ? (
+                          <img
+                            src={course.instructeur.image}
+                            alt={course.instructeur.user?.nom}
+                            className="w-24 h-24 rounded-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center text-2xl font-bold text-primary">
+                            {course.instructeur?.user?.nom?.charAt(0) || 'I'}
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <h3 className="font-heading font-semibold text-xl mb-1">
+                          {course.instructeur?.user?.nom}
+                        </h3>
+                        <p className="text-neutral-600 mb-3">
+                          {course.instructeur?.specialite || 'Instructor'}
+                        </p>
+                        <p className="text-neutral-600">
+                          {course.instructeur?.bio ||
+                            'No bio available for this instructor.'}
+                        </p>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -536,7 +567,7 @@ This course covers:
                         <h3 className="font-heading font-semibold text-xl">
                           Discussion Forums
                         </h3>
-                        {course.isInstructor && (
+                        {userRole === 'instructeur' && (
                           <button
                             onClick={() => setShowNewForumForm(true)}
                             className="btn-primary flex items-center"
@@ -547,7 +578,7 @@ This course covers:
                         )}
                       </div>
 
-                      {showNewForumForm && (
+                      {showNewForumForm && userRole === 'instructeur' && (
                         <div className="bg-white p-4 rounded-lg border border-neutral-200 mb-6">
                           <h4 className="font-medium mb-3">
                             Create a New Discussion Forum
@@ -584,7 +615,7 @@ This course covers:
                         </div>
                       )}
 
-                      {/* Forum Messages View */}
+                      {/* Forum detail view */}
                       {activeForumId ? (
                         <div>
                           {getActiveForum() && (
@@ -600,89 +631,111 @@ This course covers:
 
                               <div className="bg-white p-4 rounded-lg border border-neutral-200 mb-6">
                                 <h4 className="font-semibold text-xl mb-2">
-                                  {getActiveForum().title}
+                                  {getActiveForum().titre ||
+                                    getActiveForum().title}
                                 </h4>
                                 <p className="text-neutral-600 mb-2">
                                   {getActiveForum().description}
                                 </p>
                                 <div className="text-sm text-neutral-500">
-                                  Created by {getActiveForum().createdBy} •{' '}
-                                  {getActiveForum().createdAt}
+                                  Created{' '}
+                                  {formatDate(
+                                    getActiveForum().dateCreation ||
+                                      getActiveForum().createdAt,
+                                  )}
                                 </div>
                               </div>
 
                               <div className="space-y-4 mb-6">
-                                {getActiveForum().messages.map((message) => (
-                                  <div
-                                    key={message.id}
-                                    className={`p-4 rounded-lg ${
-                                      message.isInstructor
-                                        ? 'bg-primary/5 border-l-4 border-primary'
-                                        : 'bg-white border border-neutral-200'
-                                    }`}
-                                  >
-                                    <div className="flex items-center mb-2">
-                                      <span className="font-medium mr-2">
-                                        {message.author}
-                                      </span>
-                                      {message.isInstructor && (
-                                        <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">
-                                          Instructor
+                                {getActiveForum().discussions?.map(
+                                  (discussion) => (
+                                    <div
+                                      key={discussion.id}
+                                      className={`p-4 rounded-lg ${
+                                        discussion.user?.role === 'instructeur'
+                                          ? 'bg-primary/5 border-l-4 border-primary'
+                                          : 'bg-white border border-neutral-200'
+                                      }`}
+                                    >
+                                      <div className="flex items-center mb-2">
+                                        <span className="font-medium mr-2">
+                                          {discussion.user?.nom || 'Anonymous'}
                                         </span>
-                                      )}
-                                      <span className="text-sm text-neutral-500 ml-auto">
-                                        {message.timestamp}
-                                      </span>
+                                        {discussion.user?.role ===
+                                          'instructeur' && (
+                                          <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">
+                                            Instructor
+                                          </span>
+                                        )}
+                                        <span className="text-sm text-neutral-500 ml-auto">
+                                          {formatDate(discussion.dateCreation)}
+                                        </span>
+                                      </div>
+                                      <p className="text-neutral-700">
+                                        {discussion.contenu}
+                                      </p>
                                     </div>
-                                    <p className="text-neutral-700">
-                                      {message.text}
-                                    </p>
-                                  </div>
-                                ))}
+                                  ),
+                                )}
                               </div>
 
-                              <div className="mt-4">
-                                <label className="block text-sm font-medium text-neutral-700 mb-1">
-                                  Post a Reply
-                                </label>
-                                <div className="flex">
-                                  <textarea
-                                    value={newMessage}
-                                    onChange={(e) =>
-                                      setNewMessage(e.target.value)
-                                    }
-                                    placeholder="Type your message here..."
-                                    className="flex-grow p-3 border border-neutral-300 rounded-l-md"
-                                    rows={3}
-                                  />
-                                  <button
-                                    onClick={handleSendMessage}
-                                    className="bg-primary text-white px-4 rounded-r-md hover:bg-primary-dark transition-colors flex items-center"
-                                  >
-                                    <FiSend />
-                                  </button>
+                              {/* Only allow replies if user is enrolled or is instructor */}
+                              {(userRole === 'instructeur' ||
+                                userRole === 'etudiant') && (
+                                <div className="mt-4">
+                                  <label className="block text-sm font-medium text-neutral-700 mb-1">
+                                    Post a Reply
+                                  </label>
+                                  <div className="flex">
+                                    <textarea
+                                      value={newMessage}
+                                      onChange={(e) =>
+                                        setNewMessage(e.target.value)
+                                      }
+                                      placeholder="Type your message here..."
+                                      className="flex-grow p-3 border border-neutral-300 rounded-l-md"
+                                      rows={3}
+                                    />
+                                    <button
+                                      onClick={handleSendMessage}
+                                      className="bg-primary text-white px-4 rounded-r-md hover:bg-primary-dark transition-colors flex items-center"
+                                    >
+                                      <FiSend />
+                                    </button>
+                                  </div>
                                 </div>
-                              </div>
+                              )}
+
+                              {!userRole && (
+                                <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-md text-yellow-700">
+                                  <p>
+                                    Please log in and enroll in this course to
+                                    participate in discussions.
+                                  </p>
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
                       ) : (
                         <div className="space-y-4">
-                          {course.forums.map((forum) => (
+                          {course.forums?.map((forum) => (
                             <div
                               key={forum.id}
                               className="bg-white p-4 rounded-lg border border-neutral-200 hover:border-primary transition-colors"
                             >
                               <h4 className="font-medium text-lg mb-2">
-                                {forum.title}
+                                {forum.titre || forum.title}
                               </h4>
                               <p className="text-neutral-600 mb-3">
                                 {forum.description}
                               </p>
                               <div className="flex justify-between items-center">
                                 <div className="text-sm text-neutral-500">
-                                  Created by {forum.createdBy} •{' '}
-                                  {forum.createdAt}
+                                  Created{' '}
+                                  {formatDate(
+                                    forum.dateCreation || forum.createdAt,
+                                  )}
                                 </div>
                                 <button
                                   onClick={() => setActiveForumId(forum.id)}
@@ -692,7 +745,13 @@ This course covers:
                                 </button>
                               </div>
                             </div>
-                          ))}
+                          )) || (
+                            <p className="text-neutral-600">
+                              {userRole === 'instructeur'
+                                ? 'No forums available yet. Create one to start discussions with your students!'
+                                : 'No forums available for this course yet.'}
+                            </p>
+                          )}
                         </div>
                       )}
                     </div>
@@ -713,21 +772,12 @@ This course covers:
                 <p className="mb-6 text-white/90">
                   Join thousands of students already enrolled in this course
                 </p>
-                {course.enrolled ? (
-                  <button
-                    onClick={startCourse}
-                    className="bg-white text-secondary hover:bg-neutral-100 font-medium py-3 px-6 rounded-md transition-colors"
-                  >
-                    Continue Learning
-                  </button>
-                ) : (
-                  <button
-                    onClick={handleEnroll}
-                    className="bg-white text-secondary hover:bg-neutral-100 font-medium py-3 px-6 rounded-md transition-colors"
-                  >
-                    Enroll Now
-                  </button>
-                )}
+                <button
+                  onClick={handleEnroll}
+                  className="bg-white text-secondary hover:bg-neutral-100 font-medium py-3 px-6 rounded-md transition-colors"
+                >
+                  {isCourseFree ? 'Go to Course' : 'Enroll Now'}
+                </button>
               </div>
             </div>
           </div>

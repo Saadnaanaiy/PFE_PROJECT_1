@@ -7,6 +7,7 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [cartUpdateFlag, setCartUpdateFlag] = useState(0);
 
   // Check if user is authenticated on initial load
   useEffect(() => {
@@ -39,6 +40,11 @@ export const AuthProvider = ({ children }) => {
 
     checkAuthStatus();
   }, []);
+
+  // Notify components that cart has been updated
+  const cartUpdated = () => {
+    setCartUpdateFlag(prev => prev + 1);
+  };
 
   // Login function
   const login = async (email, password, rememberMe = false) => {
@@ -135,6 +141,8 @@ export const AuthProvider = ({ children }) => {
     isAdmin,
     isInstructor,
     isStudent,
+    cartUpdated,
+    cartUpdateFlag
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

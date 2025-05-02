@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
@@ -51,6 +51,9 @@ const CreateCourse = () => {
   const [selectedLesson, setSelectedLesson] = useState(null);
   const [videoUploading, setVideoUploading] = useState(false);
 
+  const [uploading, setUploading] = useState(false);
+  const [processing, setProcessing] = useState(false);
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
@@ -79,43 +82,77 @@ const CreateCourse = () => {
   };
 
   // New methods for lessons
-  const handleAddLesson = (sectionId, lessonData) => {
-    setLessons({
-      ...lessons,
-      [sectionId]: [
-        ...(lessons[sectionId] || []),
-        {
-          ...lessonData,
-          id: Math.random().toString(36).substring(2, 9), // Temporary ID
-          section_id: sectionId,
-        },
-      ],
+  const handleAddLesson = async (sectionId, lessonData) => {
+    if (!sectionId) {
+      setError('Invalid section selected');
+      return;
+    }
+
+    // Show the lesson form dialog instead of creating directly
+    setSelectedLesson({
+      id: null,
+      titre: '',
+      ordre: (lessons[sectionId]?.length || 0) + 1,
+      estGratuite: false,
     });
   };
 
-  const handleRemoveLesson = (sectionId, lessonId) => {
-    setLessons({
-      ...lessons,
-      [sectionId]: lessons[sectionId].filter(
-        (lesson) => lesson.id !== lessonId,
-      ),
-    });
+  const handleUpdateLesson = async (sectionId, lessonId, updatedData) => {
+    if (!sectionId || !lessonId) {
+      setError('Invalid section or lesson selected');
+      return;
+    }
 
-    // Clean up any associated videos
-    if (videos[lessonId]) {
-      const newVideos = { ...videos };
-      delete newVideos[lessonId];
-      setVideos(newVideos);
+    try {
+      const response = await axios.put(
+        `/api/instructor/sections/${sectionId}/lessons/${lessonId}`,
+        updatedData,
+      );
+
+      console.log('Lesson updated:', response.data);
+
+      // Update lessons state with the updated lesson
+      setLessons({
+        ...lessons,
+        [sectionId]: lessons[sectionId].map((lesson) =>
+          lesson.id === lessonId ? response.data.lesson : lesson,
+        ),
+      });
+    } catch (error) {
+      console.error('Error updating lesson:', error);
+      setError(error.response?.data?.message || 'Failed to update lesson');
     }
   };
 
-  const handleUpdateLesson = (sectionId, lessonId, updatedData) => {
-    setLessons({
-      ...lessons,
-      [sectionId]: lessons[sectionId].map((lesson) =>
-        lesson.id === lessonId ? { ...lesson, ...updatedData } : lesson,
-      ),
-    });
+  const handleRemoveLesson = async (sectionId, lessonId) => {
+    if (!sectionId || !lessonId) {
+      setError('Invalid section or lesson selected');
+      return;
+    }
+
+    try {
+      await axios.delete(
+        `/api/instructor/sections/${sectionId}/lessons/${lessonId}`,
+      );
+
+      // Update lessons state by removing the deleted lesson
+      setLessons({
+        ...lessons,
+        [sectionId]: lessons[sectionId].filter(
+          (lesson) => lesson.id !== lessonId,
+        ),
+      });
+
+      // Clean up any associated videos
+      if (videos[lessonId]) {
+        const newVideos = { ...videos };
+        delete newVideos[lessonId];
+        setVideos(newVideos);
+      }
+    } catch (error) {
+      console.error('Error removing lesson:', error);
+      setError(error.response?.data?.message || 'Failed to remove lesson');
+    }
   };
 
   // Methods for video management
@@ -132,108 +169,63 @@ const CreateCourse = () => {
     setVideos(newVideos);
   };
 
-  const handleFileChange = async (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      // Check file size (500MB limit)
-      const maxSize = 500 * 1024 * 1024; // 500MB in bytes
-      if (file.size > maxSize) {
-        setError('Video file size must be less than 500MB');
-        return;
-      }
-
-      setVideoFile(file);
-      setVideoData({
-        ...videoData,
-        titre: file.name,
-      });
-
-      // Get video duration
-      try {
-        const video = document.createElement('video');
-        video.preload = 'metadata';
-        video.onloadedmetadata = () => {
-          const duration = Math.ceil(video.duration / 60); // Convert to minutes
-          setVideoData((prev) => ({
-            ...prev,
-            dureeMinutes: duration,
-          }));
-        };
-        video.src = URL.createObjectURL(file);
-      } catch (error) {
-        console.error('Error getting video duration:', error);
-      }
-    }
-  };
-
-  const handleUpload = async () => {
-    if (!videoFile) return;
-
-    setUploading(true);
-    setError(null);
-
+  // Add new function to handle course creation and move to sections
+  const handleNextToSections = async () => {
     try {
-      // Create a chunked upload
-      const chunkSize = 5 * 1024 * 1024; // 5MB chunks
-      const totalChunks = Math.ceil(videoFile.size / chunkSize);
-      let uploadedChunks = 0;
+      // Create FormData object for file upload
+      const courseFormData = new FormData();
+      for (const key in formData) {
+        if (formData[key] !== null) {
+          courseFormData.append(key, formData[key]);
+        }
+      }
 
-      for (let chunk = 0; chunk < totalChunks; chunk++) {
-        const start = chunk * chunkSize;
-        const end = Math.min(start + chunkSize, videoFile.size);
-        const fileChunk = videoFile.slice(start, end);
-
-        const formData = new FormData();
-        formData.append('chunk', fileChunk);
-        formData.append('chunkNumber', chunk + 1);
-        formData.append('totalChunks', totalChunks);
-        formData.append('fileName', videoFile.name);
-        formData.append('lessonId', lessonId);
-        formData.append('videoData', JSON.stringify(videoData));
-
-        await axios.post('/api/instructor/upload-video-chunk', formData, {
+      // Create the course first
+      const courseResponse = await axios.post(
+        '/api/instructor/courses',
+        courseFormData,
+        {
           headers: {
             'Content-Type': 'multipart/form-data',
           },
-          onUploadProgress: (progressEvent) => {
-            const chunkProgress =
-              (progressEvent.loaded / progressEvent.total) * 100;
-            const totalProgress =
-              ((uploadedChunks + chunkProgress / 100) / totalChunks) * 100;
-            setUploadProgress(totalProgress);
-          },
-        });
-
-        uploadedChunks++;
-      }
-
-      // After all chunks are uploaded, notify the server to combine them
-      const response = await axios.post(
-        '/api/instructor/complete-video-upload',
-        {
-          fileName: videoFile.name,
-          lessonId: lessonId,
-          videoData: videoData,
         },
       );
 
-      // Update video metadata
-      handleAddVideo(lessonId, {
-        ...videoData,
-        url: response.data.url,
-        file: videoFile,
-      });
+      console.log('Course created:', courseResponse.data);
 
-      onVideoUploaded();
+      // Update formData with the course ID
+      setFormData((prev) => ({
+        ...prev,
+        id: courseResponse.data.course.id,
+      }));
+
+      // Now load sections
+      const sectionsResponse = await axios.get(
+        `/api/instructor/courses/${courseResponse.data.course.id}/sections`,
+      );
+
+      console.log('Sections loaded:', sectionsResponse.data);
+
+      // Ensure sections have IDs
+      const validSections = sectionsResponse.data.sections.map((section) => ({
+        ...section,
+        id: section.id, // Ensure each section has an ID
+      }));
+
+      setSections(validSections);
+
+      // Move to next step
+      nextStep();
     } catch (error) {
-      console.error('Upload failed:', error);
-      setError(error.response?.data?.message || 'Failed to upload video');
-    } finally {
-      setUploading(false);
-      setUploadProgress(0);
+      console.error('Error creating course or loading sections:', error);
+      setError(
+        error.response?.data?.message ||
+          'Failed to create course or load sections',
+      );
     }
   };
 
+  // Update the handleSubmit function to handle the final submission
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -256,7 +248,6 @@ const CreateCourse = () => {
 
       // Add sections if any
       if (sections.length > 0) {
-        // Create a proper array structure for Laravel to recognize
         sections.forEach((section, index) => {
           Object.keys(section).forEach((key) => {
             courseFormData.append(`sections[${index}][${key}]`, section[key]);
@@ -267,49 +258,34 @@ const CreateCourse = () => {
           sectionLessons.forEach((lesson, lessonIndex) => {
             Object.keys(lesson).forEach((key) => {
               if (key !== 'id' && key !== 'file') {
-                // Skip temporary id and file object
                 courseFormData.append(
                   `sections[${index}][lecons][${lessonIndex}][${key}]`,
                   lesson[key],
                 );
               }
             });
-
-            // Add video if exists for this lesson
-            if (videos[lesson.id]) {
-              const video = videos[lesson.id];
-              Object.keys(video).forEach((key) => {
-                if (key !== 'file') {
-                  courseFormData.append(
-                    `sections[${index}][lecons][${lessonIndex}][video][${key}]`,
-                    video[key],
-                  );
-                }
-              });
-
-              // Add video file if exists
-              if (video.file) {
-                courseFormData.append(
-                  `sections[${index}][lecons][${lessonIndex}][video][file]`,
-                  video.file,
-                );
-              }
-            }
           });
         });
       }
 
-      await axios.post('/api/instructor/courses', courseFormData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
+      // If course already exists, update it
+      if (formData.id) {
+        await axios.put(
+          `/api/instructor/courses/${formData.id}`,
+          courseFormData,
+          {
+            headers: {
+              'Content-Type': 'multipart/form-data',
+            },
+          },
+        );
+      }
 
       // Redirect to courses list
       navigate('/instructor/courses');
     } catch (err) {
-      console.error('Error creating course:', err);
-      setError(err.response?.data?.message || 'Failed to create course');
+      console.error('Error creating/updating course:', err);
+      setError(err.response?.data?.message || 'Failed to create/update course');
       window.scrollTo(0, 0);
     } finally {
       setLoading(false);
@@ -372,9 +348,34 @@ const CreateCourse = () => {
       });
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
       e.preventDefault();
-      onSave(lessonData);
+
+      if (!lessonData.titre.trim()) {
+        setError('Lesson title is required');
+        return;
+      }
+
+      try {
+        const response = await axios.post(
+          `/api/instructor/sections/${sectionId}/lessons`,
+          lessonData,
+        );
+
+        console.log('Lesson created:', response.data);
+
+        // Update lessons state with the new lesson
+        setLessons({
+          ...lessons,
+          [sectionId]: [...(lessons[sectionId] || []), response.data.lesson],
+        });
+
+        // Call the onSave callback to close the form
+        onSave(lessonData);
+      } catch (error) {
+        console.error('Error adding lesson:', error);
+        setError(error.response?.data?.message || 'Failed to add lesson');
+      }
     };
 
     return (
@@ -383,7 +384,7 @@ const CreateCourse = () => {
         className="bg-neutral-50 p-4 rounded-lg border border-neutral-200 mb-4"
       >
         <h4 className="font-medium text-neutral-800 mb-3">
-          {lesson ? 'Edit Lesson' : 'Add New Lesson'}
+          {lesson?.id ? 'Edit Lesson' : 'Add New Lesson'}
         </h4>
 
         <div className="mb-3">
@@ -447,7 +448,7 @@ const CreateCourse = () => {
             type="submit"
             className="px-4 py-2 text-sm rounded-lg bg-primary text-white hover:bg-primary-dark"
           >
-            {lesson ? 'Update' : 'Add'} Lesson
+            {lesson?.id ? 'Update' : 'Add'} Lesson
           </button>
         </div>
       </form>
@@ -463,11 +464,14 @@ const CreateCourse = () => {
   }) => {
     const [videoFile, setVideoFile] = useState(null);
     const [uploading, setUploading] = useState(false);
+    const [processing, setProcessing] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(0);
     const [videoData, setVideoData] = useState({
       titre: existingVideo?.titre || '',
       dureeMinutes: existingVideo?.dureeMinutes || '',
     });
+
+    const CHUNK_SIZE = 1024 * 1024; // 1MB chunks
 
     const handleFileChange = async (e) => {
       const file = e.target.files[0];
@@ -503,12 +507,25 @@ const CreateCourse = () => {
       }
     };
 
-    const handleInputChange = (e) => {
-      const { name, value } = e.target;
-      setVideoData({
-        ...videoData,
-        [name]: value,
-      });
+    const uploadChunk = async (chunk, chunkIndex, totalChunks, uploadId) => {
+      const formData = new FormData();
+      formData.append('chunk', chunk);
+      formData.append('chunkIndex', chunkIndex);
+      formData.append('totalChunks', totalChunks);
+      formData.append('uploadId', uploadId);
+      formData.append('filename', videoFile.name);
+
+      try {
+        await axios.post(
+          `/api/instructor/lessons/${lessonId}/video/chunk`,
+          formData,
+          {
+            headers: { 'Content-Type': 'multipart/form-data' },
+          },
+        );
+      } catch (error) {
+        throw new Error(`Failed to upload chunk ${chunkIndex}`);
+      }
     };
 
     const handleUpload = async () => {
@@ -518,54 +535,63 @@ const CreateCourse = () => {
       setError(null);
 
       try {
-        // Create a chunked upload
-        const chunkSize = 5 * 1024 * 1024; // 5MB chunks
-        const totalChunks = Math.ceil(videoFile.size / chunkSize);
-        let uploadedChunks = 0;
-
-        for (let chunk = 0; chunk < totalChunks; chunk++) {
-          const start = chunk * chunkSize;
-          const end = Math.min(start + chunkSize, videoFile.size);
-          const fileChunk = videoFile.slice(start, end);
-
-          const formData = new FormData();
-          formData.append('chunk', fileChunk);
-          formData.append('chunkNumber', chunk + 1);
-          formData.append('totalChunks', totalChunks);
-          formData.append('fileName', videoFile.name);
-          formData.append('lessonId', lessonId);
-          formData.append('videoData', JSON.stringify(videoData));
-
-          await axios.post('/api/instructor/upload-video-chunk', formData, {
-            headers: {
-              'Content-Type': 'multipart/form-data',
-            },
-            onUploadProgress: (progressEvent) => {
-              const chunkProgress =
-                (progressEvent.loaded / progressEvent.total) * 100;
-              const totalProgress =
-                ((uploadedChunks + chunkProgress / 100) / totalChunks) * 100;
-              setUploadProgress(totalProgress);
-            },
-          });
-
-          uploadedChunks++;
-        }
-
-        // After all chunks are uploaded, notify the server to combine them
-        const response = await axios.post(
-          '/api/instructor/complete-video-upload',
+        // Initialize upload
+        const initResponse = await axios.post(
+          `/api/instructor/lessons/${lessonId}/video/init`,
           {
-            fileName: videoFile.name,
-            lessonId: lessonId,
-            videoData: videoData,
+            filename: videoFile.name,
+            totalSize: videoFile.size,
+            titre: videoData.titre,
+            dureeMinutes: videoData.dureeMinutes,
           },
         );
 
-        // Update video metadata
+        const { uploadId } = initResponse.data;
+        const totalChunks = Math.ceil(videoFile.size / CHUNK_SIZE);
+
+        // Upload chunks
+        for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+          const start = chunkIndex * CHUNK_SIZE;
+          const end = Math.min(start + CHUNK_SIZE, videoFile.size);
+          const chunk = videoFile.slice(start, end);
+
+          // Create FormData for this chunk
+          const formData = new FormData();
+          formData.append('chunk', new Blob([chunk]), 'chunk');
+          formData.append('uploadId', uploadId);
+          formData.append('chunkIndex', chunkIndex);
+          formData.append('totalChunks', totalChunks);
+
+          // Upload the chunk
+          await axios.post(
+            `/api/instructor/lessons/${lessonId}/video/chunk`,
+            formData,
+            {
+              headers: {
+                'Content-Type': 'multipart/form-data',
+              },
+            },
+          );
+
+          const progress = Math.round(((chunkIndex + 1) / totalChunks) * 100);
+          setUploadProgress(progress);
+        }
+
+        setUploading(false);
+        setProcessing(true);
+
+        // Complete upload
+        const completeResponse = await axios.post(
+          `/api/instructor/lessons/${lessonId}/video/complete`,
+          {
+            uploadId,
+            filename: videoFile.name,
+          },
+        );
+
         handleAddVideo(lessonId, {
           ...videoData,
-          url: response.data.url,
+          url: completeResponse.data.video?.url,
           file: videoFile,
         });
 
@@ -575,6 +601,7 @@ const CreateCourse = () => {
         setError(error.response?.data?.message || 'Failed to upload video');
       } finally {
         setUploading(false);
+        setProcessing(false);
         setUploadProgress(0);
       }
     };
@@ -655,8 +682,8 @@ const CreateCourse = () => {
                   />
                 </div>
 
-                {uploading ? (
-                  <div className="mt-4">
+                {uploading || processing ? (
+                  <div className="mt-4 flex flex-col items-center">
                     <div className="w-full bg-neutral-200 rounded-full h-2.5">
                       <div
                         className="bg-primary h-2.5 rounded-full"
@@ -664,7 +691,9 @@ const CreateCourse = () => {
                       ></div>
                     </div>
                     <div className="text-sm text-neutral-600 mt-1 text-center">
-                      Uploading... {Math.round(uploadProgress)}%
+                      {uploading
+                        ? `Uploading... ${Math.round(uploadProgress)}%`
+                        : 'Processing video...'}
                     </div>
                   </div>
                 ) : (
@@ -686,7 +715,7 @@ const CreateCourse = () => {
                   Click to select a video file
                 </p>
                 <p className="text-neutral-500 text-sm">
-                  MP4, WebM or MOV. Max 2GB.
+                  MP4, WebM or MOV. Max 500MB.
                 </p>
                 <input
                   id="videoFile"
@@ -699,6 +728,221 @@ const CreateCourse = () => {
             )}
           </div>
         )}
+      </div>
+    );
+  };
+
+  const handleAddSection = async (sectionData) => {
+    try {
+      if (!formData.id) {
+        setError('Please complete course details first');
+        return;
+      }
+
+      console.log('Adding section:', sectionData);
+      const response = await axios.post(
+        `/api/instructor/courses/${formData.id}/sections`,
+        sectionData,
+      );
+      console.log('Section created:', response.data);
+
+      // Make sure we have a valid section with an ID
+      const createdSection = response.data.section;
+      if (!createdSection || !createdSection.id) {
+        throw new Error('Invalid section data received from server');
+      }
+
+      // Update sections state with the new section
+      setSections((prevSections) => {
+        const updatedSections = [...prevSections, createdSection];
+        console.log('Updated sections:', updatedSections);
+        return updatedSections;
+      });
+
+      return createdSection;
+    } catch (error) {
+      console.error('Error adding section:', error);
+      setError(error.response?.data?.message || 'Failed to add section');
+      throw error;
+    }
+  };
+
+  // Update the handleNextToLessons function with debug logs
+  const handleNextToLessons = async () => {
+    try {
+      // Check if we have any sections
+      if (!sections || sections.length === 0) {
+        setError('Please add at least one section before proceeding');
+        return;
+      }
+
+      // Get the current section
+      const currentSection = sections[currentSectionIndex];
+      console.log('Current section:', currentSection);
+
+      // Validate that we have a valid section with an ID
+      if (!currentSection || !currentSection.id) {
+        setError(
+          'Invalid section selected. Please try adding the section again.',
+        );
+        return;
+      }
+
+      // Load lessons for the current section
+      const response = await axios.get(
+        `/api/instructor/sections/${currentSection.id}/lessons`,
+      );
+      console.log('Lessons loaded:', response.data);
+
+      // Update lessons state
+      setLessons({
+        ...lessons,
+        [currentSection.id]: response.data.lessons || [],
+      });
+
+      // Move to next step
+      nextStep();
+    } catch (error) {
+      console.error('Error loading lessons:', error);
+      setError(error.response?.data?.message || 'Failed to load lessons');
+    }
+  };
+
+  // Update the SectionManager component
+  const SectionManager = ({ sections, setSections }) => {
+    const [newSection, setNewSection] = useState({
+      titre: '',
+      ordre: sections.length + 1,
+    });
+
+    const handleAddSection = async () => {
+      if (!newSection.titre.trim()) {
+        setError('Section title is required');
+        return;
+      }
+
+      if (!formData.id) {
+        setError('Please complete course details first');
+        return;
+      }
+
+      try {
+        console.log('Adding new section:', newSection);
+        const response = await axios.post(
+          `/api/instructor/courses/${formData.id}/sections`,
+          newSection,
+        );
+        console.log('Section created:', response.data);
+
+        // Make sure we're using the section from the response which includes the ID
+        const createdSection = response.data.section;
+        if (!createdSection || !createdSection.id) {
+          throw new Error('Invalid section data received from server');
+        }
+
+        // Update sections state with the new section
+        setSections((prevSections) => {
+          const updatedSections = [...prevSections, createdSection];
+          console.log('Updated sections:', updatedSections);
+          return updatedSections;
+        });
+
+        // Reset the form
+        setNewSection({ titre: '', ordre: sections.length + 2 });
+      } catch (error) {
+        console.error('Error adding section:', error);
+        setError(error.response?.data?.message || 'Failed to add section');
+      }
+    };
+
+    const handleInputChange = (e) => {
+      const { name, value } = e.target;
+      setNewSection((prev) => ({
+        ...prev,
+        [name]: value,
+      }));
+    };
+
+    return (
+      <div className="space-y-6">
+        {/* Existing sections list */}
+        {sections.length > 0 && (
+          <div className="space-y-4">
+            {sections.map((section, index) => (
+              <div
+                key={section.id || index}
+                className="bg-neutral-50 p-4 rounded-lg border border-neutral-200 flex items-center justify-between"
+              >
+                <div className="flex items-center">
+                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-neutral-100 text-neutral-700 mr-3 text-sm font-medium">
+                    {index + 1}
+                  </div>
+                  <h3 className="font-medium text-neutral-800">
+                    {section.titre}
+                  </h3>
+                </div>
+                <button
+                  onClick={async () => {
+                    if (section.id) {
+                      try {
+                        await axios.delete(
+                          `/api/instructor/courses/${formData.id}/sections/${section.id}`,
+                        );
+                        setSections((prevSections) =>
+                          prevSections.filter((s) => s.id !== section.id),
+                        );
+                      } catch (error) {
+                        console.error('Error deleting section:', error);
+                        setError(
+                          error.response?.data?.message ||
+                            'Failed to delete section',
+                        );
+                      }
+                    } else {
+                      setSections((prevSections) =>
+                        prevSections.filter((s) => s !== section),
+                      );
+                    }
+                  }}
+                  className="text-neutral-500 hover:text-red-500"
+                >
+                  <FiTrash2 />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Add new section form */}
+        <div className="bg-neutral-50 p-4 rounded-lg border border-neutral-200">
+          <h3 className="font-medium text-neutral-800 mb-4">Add New Section</h3>
+          <div className="space-y-4">
+            <div>
+              <label
+                htmlFor="sectionTitle"
+                className="block text-sm font-medium text-neutral-700 mb-1"
+              >
+                Section Title*
+              </label>
+              <input
+                type="text"
+                id="sectionTitle"
+                name="titre"
+                value={newSection.titre}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 rounded-lg border border-neutral-300 focus:ring-2 focus:ring-primary focus:border-transparent shadow-sm"
+                placeholder="Enter section title"
+                required
+              />
+            </div>
+            <button
+              onClick={handleAddSection}
+              className="w-full px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark flex items-center justify-center"
+            >
+              <FiPlusCircle className="mr-2" /> Add Section
+            </button>
+          </div>
+        </div>
       </div>
     );
   };
@@ -981,7 +1225,7 @@ const CreateCourse = () => {
               </button>
               <button
                 type="button"
-                onClick={nextStep}
+                onClick={handleNextToSections}
                 disabled={
                   !formData.titre ||
                   !formData.description ||
@@ -1033,7 +1277,7 @@ const CreateCourse = () => {
               </button>
               <button
                 type="button"
-                onClick={nextStep}
+                onClick={handleNextToLessons}
                 disabled={sections.length === 0}
                 className={`flex items-center justify-center px-8 py-3 rounded-full bg-primary text-white font-medium shadow-md hover:shadow-lg transition-all hover:translate-y-[-1px] active:translate-y-[1px] ${
                   sections.length === 0
@@ -1237,54 +1481,48 @@ const CreateCourse = () => {
                     Select a lesson to add video content.
                   </p>
 
-                  {sections.map((section) => {
-                    // Only show sections that have lessons
-                    const sectionLessons = lessons[section.id] || [];
-                    if (sectionLessons.length === 0) return null;
-
-                    return (
-                      <div key={section.id} className="mb-6">
-                        <h3 className="font-medium text-neutral-700 mb-2">
-                          {section.titre}
-                        </h3>
-                        <div className="space-y-2 pl-4 border-l-2 border-neutral-200">
-                          {sectionLessons.map((lesson) => (
-                            <button
-                              key={lesson.id}
-                              onClick={() => setSelectedLesson(lesson)}
-                              className={`w-full text-left px-4 py-2 rounded-lg flex items-center justify-between ${
-                                selectedLesson?.id === lesson.id
-                                  ? 'bg-primary text-white'
-                                  : 'bg-white border border-neutral-200 text-neutral-700 hover:border-primary'
-                              }`}
-                            >
-                              <div className="flex items-center">
-                                <div
-                                  className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium mr-2 ${
-                                    selectedLesson?.id === lesson.id
-                                      ? 'bg-white text-primary'
-                                      : 'bg-neutral-100 text-neutral-700'
-                                  }`}
-                                >
-                                  {lesson.ordre}
-                                </div>
-                                {lesson.titre}
+                  {sections.map((section) => (
+                    <div key={section.id} className="mb-6">
+                      <h3 className="font-medium text-neutral-700 mb-2">
+                        {section.titre}
+                      </h3>
+                      <div className="space-y-2 pl-4 border-l-2 border-neutral-200">
+                        {lessons[section.id]?.map((lesson) => (
+                          <button
+                            key={lesson.id}
+                            onClick={() => setSelectedLesson(lesson)}
+                            className={`w-full text-left px-4 py-2 rounded-lg flex items-center justify-between ${
+                              selectedLesson?.id === lesson.id
+                                ? 'bg-primary text-white'
+                                : 'bg-white border border-neutral-200 text-neutral-700 hover:border-primary'
+                            }`}
+                          >
+                            <div className="flex items-center">
+                              <div
+                                className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium mr-2 ${
+                                  selectedLesson?.id === lesson.id
+                                    ? 'bg-white text-primary'
+                                    : 'bg-neutral-100 text-neutral-700'
+                                }`}
+                              >
+                                {lesson.ordre}
                               </div>
-                              {videos[lesson.id] && (
-                                <FiFilm
-                                  className={`${
-                                    selectedLesson?.id === lesson.id
-                                      ? 'text-white'
-                                      : 'text-primary'
-                                  }`}
-                                />
-                              )}
-                            </button>
-                          ))}
-                        </div>
+                              {lesson.titre}
+                            </div>
+                            {videos[lesson.id] && (
+                              <FiFilm
+                                className={`${
+                                  selectedLesson?.id === lesson.id
+                                    ? 'text-white'
+                                    : 'text-primary'
+                                }`}
+                              />
+                            )}
+                          </button>
+                        ))}
                       </div>
-                    );
-                  })}
+                    </div>
+                  ))}
                 </div>
 
                 {selectedLesson && (

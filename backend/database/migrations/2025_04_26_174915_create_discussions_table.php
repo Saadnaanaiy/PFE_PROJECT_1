@@ -10,9 +10,10 @@ return new class extends Migration
     {
         Schema::create('discussions', function (Blueprint $table) {
             $table->id();
-            $table->string('sujet');
+            $table->text('contenu');
             $table->timestamp('dateCreation')->useCurrent();
             $table->foreignId('forum_id')->constrained()->onDelete('cascade');
+            $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->timestamps();
         });
     }

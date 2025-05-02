@@ -18,14 +18,16 @@ class CoursController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Cours::with(['instructeur', 'categorie']);
+        $query = Cours::with(['instructeur.user' => function($query) {
+            $query->select('id', 'nom', 'email', 'image');
+        }, 'categorie']);
 
         // Apply search if provided
         if ($request->has('search')) {
             $searchTerm = $request->search;
             $query->where(function ($q) use ($searchTerm) {
                 $q->where('titre', 'like', "%{$searchTerm}%")
-                    ->orWhereHas('instructeur', function ($q) use ($searchTerm) {
+                    ->orWhereHas('instructeur.user', function ($q) use ($searchTerm) {
                         $q->where('nom', 'like', "%{$searchTerm}%");
                     });
             });
@@ -88,6 +90,30 @@ class CoursController extends Controller
 
         $courses = $query->paginate(9);
 
+        // Transform the courses to include full image URLs
+        $courses->getCollection()->transform(function ($course) {
+            // Transform course image
+            if ($course->image) {
+                $course->image = asset('storage/' . $course->image);
+            }
+
+            // Transform instructor image
+            if ($course->instructeur) {
+                if ($course->instructeur->image) {
+                    $course->instructeur->image = asset('storage/' . $course->instructeur->image);
+                }
+                if ($course->instructeur->user) {
+                    if ($course->instructeur->user->image) {
+                        $course->instructeur->user->image = asset('storage/' . $course->instructeur->user->image);
+                    }
+                    // Add full name for instructor
+                    $course->instructeur->user->full_name = $course->instructeur->user->nom;
+                }
+            }
+
+            return $course;
+        });
+
         return response()->json([
             'status' => 'success',
             'data' => $courses
@@ -141,6 +167,28 @@ class CoursController extends Controller
 
         $course->save();
 
+        // Load the instructor relationship with user data
+        $course->load(['instructeur.user' => function($query) {
+            $query->select('id', 'nom', 'email', 'image');
+        }]);
+
+        // Transform images to full URLs
+        if ($course->image) {
+            $course->image = asset('storage/' . $course->image);
+        }
+        if ($course->instructeur) {
+            if ($course->instructeur->image) {
+                $course->instructeur->image = asset('storage/' . $course->instructeur->image);
+            }
+            if ($course->instructeur->user) {
+                if ($course->instructeur->user->image) {
+                    $course->instructeur->user->image = asset('storage/' . $course->instructeur->user->image);
+                }
+                // Add full name for instructor
+                $course->instructeur->user->full_name = $course->instructeur->user->nom;
+            }
+        }
+
         return response()->json([
             'status' => 'success',
             'message' => 'Cours créé avec succès',
@@ -156,9 +204,56 @@ class CoursController extends Controller
      */
     public function show($id)
     {
-        $course = Cours::with(['instructeur', 'sections.lessons', 'categorie'])
-            ->withCount('etudiants')
-            ->findOrFail($id);
+        $course = Cours::with([
+            'instructeur.user' => function($query) {
+                $query->select('id', 'nom', 'email', 'image');
+            },
+            'categorie',
+            'sections.lecons.video',
+            'forums.discussions.user'
+        ])->withCount('etudiants')->findOrFail($id);
+
+        // Transform images to full URLs
+        if ($course->image) {
+            $course->image = asset('storage/' . $course->image);
+        }
+        if ($course->instructeur) {
+            if ($course->instructeur->image) {
+                $course->instructeur->image = asset('storage/' . $course->instructeur->image);
+            }
+            if ($course->instructeur->user) {
+                if ($course->instructeur->user->image) {
+                    $course->instructeur->user->image = asset('storage/' . $course->instructeur->user->image);
+                }
+                $course->instructeur->user->full_name = $course->instructeur->user->nom;
+            }
+        }
+
+        // Transform section/lesson/video structure
+        if ($course->sections) {
+            foreach ($course->sections as $section) {
+                if ($section->lecons) {
+                    foreach ($section->lecons as $lecon) {
+                        if ($lecon->video && $lecon->video->url) {
+                            $lecon->video->url = asset('storage/' . $lecon->video->url);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Transform user images in discussions
+        if ($course->forums) {
+            foreach ($course->forums as $forum) {
+                if ($forum->discussions) {
+                    foreach ($forum->discussions as $discussion) {
+                        if ($discussion->user && $discussion->user->image) {
+                            $discussion->user->image = asset('storage/' . $discussion->user->image);
+                        }
+                    }
+                }
+            }
+        }
 
         return response()->json([
             'status' => 'success',
@@ -226,6 +321,28 @@ class CoursController extends Controller
 
         $course->save();
 
+        // Load the instructor relationship with user data
+        $course->load(['instructeur.user' => function($query) {
+            $query->select('id', 'nom', 'email', 'image');
+        }]);
+
+        // Transform images to full URLs
+        if ($course->image) {
+            $course->image = asset('storage/' . $course->image);
+        }
+        if ($course->instructeur) {
+            if ($course->instructeur->image) {
+                $course->instructeur->image = asset('storage/' . $course->instructeur->image);
+            }
+            if ($course->instructeur->user) {
+                if ($course->instructeur->user->image) {
+                    $course->instructeur->user->image = asset('storage/' . $course->instructeur->user->image);
+                }
+                // Add full name for instructor
+                $course->instructeur->user->full_name = $course->instructeur->user->nom;
+            }
+        }
+
         return response()->json([
             'status' => 'success',
             'message' => 'Cours mis à jour avec succès',
@@ -279,4 +396,114 @@ class CoursController extends Controller
         ]);
     }
 
+    /**
+     * Get all forums for a course
+     *
+     * @param int $id Course ID
+     * @return \Illuminate\Http\Response
+     */
+    public function getForums($id)
+    {
+        $course = Cours::findOrFail($id);
+        $forums = $course->forums()->with('discussions')->get();
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $forums
+        ]);
+    }
+
+    /**
+     * Create a new forum for a course
+     *
+     * @param \Illuminate\Http\Request $request
+     * @param int $id Course ID
+     * @return \Illuminate\Http\Response
+     */
+    public function createForum(Request $request, $id)
+    {
+        $validator = Validator::make($request->all(), [
+            'titre' => 'required|string|max:255',
+            'description' => 'required|string'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => 'error',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        $course = Cours::findOrFail($id);
+
+        // Check if user is authorized (is the instructor of this course)
+        $user = Auth::user();
+        if (!$user || ($user->role !== 'instructeur')) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'You are not authorized to create forums for this course'
+            ], 403);
+        }
+
+        $forum = new \App\Models\Forum([
+            'titre' => $request->titre,
+            'description' => $request->description,
+            'dateCreation' => now(),
+            'cours_id' => $course->id
+        ]);
+
+        $forum->save();
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Forum created successfully',
+            'data' => $forum
+        ], 201);
+    }
+
+    /**
+     * Add a discussion to a forum
+     *
+     * @param \Illuminate\Http\Request $request
+     * @param int $forumId Forum ID
+     * @return \Illuminate\Http\Response
+     */
+    public function addDiscussion(Request $request, $forumId)
+    {
+        $validator = Validator::make($request->all(), [
+            'message' => 'required|string'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => 'error',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        $forum = \App\Models\Forum::findOrFail($forumId);
+        $user = Auth::user();
+
+        if (!$user) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'You must be logged in to participate in discussions'
+            ], 403);
+        }
+
+        $discussion = new \App\Models\Discussion([
+            'contenu' => $request->message,
+            'dateCreation' => now(),
+            'forum_id' => $forum->id,
+            'user_id' => $user->id
+        ]);
+
+        $discussion->save();
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Discussion added successfully',
+            'data' => $discussion
+        ], 201);
+    }
 }
