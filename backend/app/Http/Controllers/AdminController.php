@@ -6,6 +6,9 @@ use App\Models\Categorie;
 use App\Models\Cours;
 use App\Models\Etudiant;
 use App\Models\Instructeur;
+use App\Models\Section;
+use App\Models\Lecon;
+use App\Models\Video;
 use Illuminate\Http\Request;
 
 class AdminController extends Controller
@@ -46,7 +49,21 @@ class AdminController extends Controller
         }
 
         $categories = Categorie::all();
-        return response()->json([$students, $instructors, $courses, $categories], 200);
+
+        // Get sections, lessons, and videos
+        $sections = Section::all();
+        $lecons = Lecon::all();
+        $videos = Video::all();
+
+        return response()->json([
+            $students,
+            $instructors,
+            $courses,
+            $categories,
+            $sections,
+            $lecons,
+            $videos
+        ], 200);
     }
 
     public function deleteCourse(string $id)
