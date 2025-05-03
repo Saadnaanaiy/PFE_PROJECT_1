@@ -14,6 +14,9 @@ import {
   FiFile,
   FiTrash,
   FiEdit,
+  FiMessageCircle,
+  FiLock,
+  FiMessageSquare,
 } from 'react-icons/fi';
 import axios from 'axios';
 import moroccanPattern from '../assets/moroccan-pattern.svg';
@@ -30,6 +33,12 @@ function AdminDashboard() {
     instructeurs: [],
     courses: [],
     categories: [],
+    sections: [],
+    lessons: [],
+    videos: [],
+    forums: [],
+    discussions: [],
+    messages: [],
   });
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('students');
@@ -39,6 +48,7 @@ function AdminDashboard() {
   const [error, setError] = useState(null);
   const [downloadType, setDownloadType] = useState(null);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [user, setUser] = useState(null);
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingCourse, setEditingCourse] = useState(null);
@@ -69,6 +79,12 @@ function AdminDashboard() {
           instructeurs: res.data[1] || [],
           courses: res.data[2] || [],
           categories: res.data[3] || [],
+          sections: res.data[4] || [],
+          lessons: res.data[5] || [],
+          videos: res.data[6] || [],
+          forums: res.data[7] || [],
+          discussions: res.data[8] || [],
+          messages: res.data[9] || [],
         });
         console.log(dashboardData);
       } catch (err) {
@@ -78,7 +94,18 @@ function AdminDashboard() {
         setLoading(false);
       }
     };
+
+    const fetchUserData = async () => {
+      try {
+        const response = await axios.get('/api/user/profile');
+        setUser(response.data);
+      } catch (err) {
+        console.error('Error fetching user data:', err);
+      }
+    };
+
     fetchData();
+    fetchUserData();
   }, []);
 
   const specialties = Array.from(
@@ -648,6 +675,29 @@ function AdminDashboard() {
       count: dashboardData.categories?.length || 0,
       icon: <FiStar size={24} className="text-yellow-500" />,
     },
+
+    {
+      title: 'Sections',
+      count: dashboardData.sections?.length || 0,
+      icon: <FiLock size={24} className="text-blue-500" />,
+    },
+
+    {
+      title: 'Forums',
+      count: dashboardData.forums?.length || 0,
+      icon: <FiMessageCircle size={24} className="text-blue-500" />,
+    },
+    {
+      title: 'Discussions',
+      count: dashboardData.discussions?.length || 0,
+      icon: <FiMessageSquare size={24} className="text-blue-500" />,
+    },
+
+    {
+      title: 'Messages',
+      count: dashboardData.messages?.length || 0,
+      icon: <FiMessageSquare size={24} className="text-blue-500" />,
+    },
   ];
 
   return (
@@ -664,11 +714,36 @@ function AdminDashboard() {
       <div className="absolute top-0 left-0 w-full h-64 bg-gradient-to-b from-primary/10 to-transparent z-0" />
 
       <div className="container mx-auto px-4 relative z-10">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">Admin Dashboard</h1>
-          <p className="text-neutral-600">
-            Manage students, instructors and courses
-          </p>
+        <div className="mb-8 flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold mb-2">Admin Dashboard</h1>
+            <p className="text-neutral-600">
+              Manage students, instructors and courses
+            </p>
+          </div>
+          <div className="flex items-center space-x-4">
+            <div className="w-12 h-12 bg-neutral-100 rounded-full flex items-center justify-center overflow-hidden">
+              {user?.image ? (
+                <img
+                  src={user.image}
+                  alt="Admin Profile"
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = 'https://via.placeholder.com/150?text=Admin';
+                  }}
+                />
+              ) : (
+                <FiUser className="text-primary w-6 h-6" />
+              )}
+            </div>
+            <div>
+              <p className="font-medium text-neutral-800">
+                {user?.nom || 'Admin'}
+              </p>
+              <p className="text-sm text-neutral-500">Administrator</p>
+            </div>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">

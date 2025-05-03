@@ -29,7 +29,7 @@ class UserFactory extends Factory
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
             'role'=> 'administrateur',
-            'image'=> 'administrateurs/admin-profile.jpg', // Using the storage path for administrateurs
+            'image'=> 'administrateurs/admin.jpg', // Using the storage path for administrateurs
             'remember_token' => Str::random(10),
         ];
     }

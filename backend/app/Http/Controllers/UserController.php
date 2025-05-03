@@ -206,22 +206,23 @@ class UserController extends Controller
 public function getInstructors()
 {
     // Get instructors with related data
-    $instructors = User::where('role', 'instructeur')
-        ->with(['instructeur' => function($query) {
-            $query->select('id', 'user_id', 'bio', 'specialite', 'image');
-            // Add this to count courses if you have a courses relationship
-            // $query->withCount('courses');
-            // Add this to count students if you have a students relationship
-            // $query->withCount('students');
-        }])
-        ->get();
+   $instructors = User::where('role', 'instructeur')
+    ->with(['instructeur' => function($query) {
+        $query->select('id', 'user_id', 'bio', 'specialite', 'image');
+        // Add this to include courses created by the instructor
+        $query->with(['cours' => function($coursQuery) {
+            $coursQuery->select('id', 'titre', 'description', 'prix', 'niveau',
+                               'image', 'instructeur_id', 'categorie_id');
+        }]);
+        // Count courses created by the instructor
+        $query->withCount('cours');
+    }])
+    ->get();
 
     // Transform the instructors collection
     $instructors->transform(function ($instructor) {
         // Add course and student counts if not available through relationships
-        if (!isset($instructor->instructeur->courses_count)) {
-            $instructor->instructeur->courses_count = rand(1, 15); // Temporary replacement for demo
-        }
+        
 
         if (!isset($instructor->instructeur->students_count)) {
             $instructor->instructeur->students_count = rand(500, 5000); // Temporary replacement for demo

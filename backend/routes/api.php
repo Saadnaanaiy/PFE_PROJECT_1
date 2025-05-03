@@ -4,6 +4,7 @@ use App\Http\Controllers\AdminController;
 use App\Http\Controllers\CoursController;
 use App\Http\Controllers\InstructorCourseController;
 use App\Http\Controllers\InstructorLessonController;
+use App\Http\Controllers\MessageController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\AdministrateurController;
 use Illuminate\Support\Facades\Route;
@@ -31,6 +32,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Forum routes
     Route::post('/courses/{id}/forums', [CoursController::class, 'createForum']);
     Route::post('/forums/{forumId}/discussions', [CoursController::class, 'addDiscussion']);
+    Route::get('/courses/{courseId}/forums/{forumId}/discussions/{discussionId}', [CoursController::class, 'showDiscussion']);
 
     // Cart routes
     Route::get('/cart', 'App\Http\Controllers\PanierController@index');
@@ -38,6 +40,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/cart/{id}', 'App\Http\Controllers\PanierController@removeFromCart');
     Route::delete('/cart', 'App\Http\Controllers\PanierController@clearCart');
     Route::get('/cart/check/{id}', 'App\Http\Controllers\PanierController@checkInCart');
+
+    Route::get('/discussions/{discussionId}/messages', [MessageController::class, 'index']);
+Route::post('/discussions/{discussionId}/messages', [MessageController::class, 'store']);
 });
 
 // Instructor-specific routes
@@ -88,6 +93,7 @@ Route::middleware('auth:sanctum')->prefix('instructor')->group(function () {
 Route::middleware(['auth:sanctum'])->prefix('admin')->group(function () {
     // Dashboard statistics
     Route::get("/dashboard", [AdminController::class, 'getStudents']);
+    Route::get('/admin/profile', [AdminController::class, 'showProfile']);
 
     // Route::get('/dashboard', [AdministrateurController::class, 'getDashboardStats']);
 

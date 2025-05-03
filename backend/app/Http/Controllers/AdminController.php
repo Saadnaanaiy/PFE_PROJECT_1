@@ -4,12 +4,16 @@ namespace App\Http\Controllers;
 
 use App\Models\Categorie;
 use App\Models\Cours;
+use App\Models\Discussion;
 use App\Models\Etudiant;
+use App\Models\Forum;
 use App\Models\Instructeur;
+use App\Models\Message;
 use App\Models\Section;
 use App\Models\Lecon;
 use App\Models\Video;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class AdminController extends Controller
 {
@@ -54,6 +58,9 @@ class AdminController extends Controller
         $sections = Section::all();
         $lecons = Lecon::all();
         $videos = Video::all();
+        $forums = Forum::all();
+        $discussions = Discussion::all();
+        $messages = Message::all();
 
         return response()->json([
             $students,
@@ -62,7 +69,10 @@ class AdminController extends Controller
             $categories,
             $sections,
             $lecons,
-            $videos
+            $videos,
+            $forums,
+            $discussions,
+            $messages
         ], 200);
     }
 
@@ -145,4 +155,30 @@ class AdminController extends Controller
 
         return response()->json(['message' => 'Instructor deleted successfully'], 200);
     }
+
+    public function showProfile(Request $request)
+{
+    $user = Auth::user();
+
+    if (! $user || $user->role !== 'administrateur') {
+        return response()->json(['error'=>'Unauthorized'], 403);
+    }
+
+    $admin = $user->administrateur;
+    if (! $admin) {
+        return response()->json(['error'=>'Admin profile not found.'], 404);
+    }
+
+    // Build the full public URL
+    $imageUrl = asset('storage/' . $admin->image);
+
+    return response()->json([
+        'admin' => [
+            'bio'       => $admin->bio ?? null,
+            'specialite'=> $admin->specialite ?? null,
+            'image_url' => $imageUrl,
+        ],
+    ]);
+}
+
 }

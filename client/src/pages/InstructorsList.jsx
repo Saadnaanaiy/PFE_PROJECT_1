@@ -18,7 +18,7 @@ const InstructorsList = () => {
         setLoading(true);
         const response = await axios.get('/api/instructors');
         console.log(response.data);
-        
+
         // Transform the data to match our component structure
         // Handling the actual structure from the API response
         const instructorsData = response.data.instructors || [];
@@ -26,16 +26,16 @@ const InstructorsList = () => {
           id: user.id,
           name: user.nom,
           specialty: user.instructeur?.specialite || "Not specified",
-          courses: user.instructeur?.courses_count || 0,
+          courses: user.instructeur?.cours_count || 0,
           students: user.instructeur?.students_count || 0,
-          image: user.instructeur?.image 
-            ? `${user.instructeur.image}` 
-            : user.image 
-              ? `${user.image}` 
+          image: user.instructeur?.image
+            ? `${user.instructeur.image}`
+            : user.image
+              ? `${user.image}`
               : '/default-profile.jpg',
           bio: user.instructeur?.bio || "No bio available",
         }));
-        
+
         setInstructors(formattedInstructors);
         setError(null);
       } catch (err) {
@@ -189,7 +189,7 @@ const InstructorsList = () => {
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.5, delay: 0.1 + index * 0.05 }}
                     >
-                      <div 
+                      <div
                         className="flex bg-white rounded-xl overflow-hidden shadow-card hover:shadow-lg transition-all group cursor-pointer"
                         onClick={() => handleInstructorClick(instructor.id)}
                       >

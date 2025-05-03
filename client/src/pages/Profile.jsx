@@ -7,6 +7,8 @@ import {
   FiGrid,
   FiLayers,
   FiBarChart2,
+  FiUserX,
+  FiShield,
 } from 'react-icons/fi';
 import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
@@ -19,15 +21,22 @@ const Profile = () => {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('courses');
   const [createdCourses, setCreatedCourses] = useState([]);
+  const [adminProfile, setAdminProfile] = useState(null);
   const [stats, setStats] = useState({
     totalEnrolled: 0,
     categoriesEnrolled: 0,
     totalCreated: 0,
     categoriesCreated: 0,
   });
+  // Add state to track images that failed to load
+  const [failedImages, setFailedImages] = useState({
+    profile: false,
+    courses: {},
+  });
 
   const isInstructor = user?.role === 'instructeur';
   const isStudent = user?.role === 'etudiant';
+  const isAdmin = user?.role === 'administrateur';
 
   // Set appropriate default tab based on user role
   useEffect(() => {
@@ -35,13 +44,31 @@ const Profile = () => {
     console.log('User role:', user?.role);
     console.log('Is instructor:', isInstructor);
     console.log('Is student:', isStudent);
+    console.log('Is admin:', isAdmin);
 
     if (isInstructor) {
       setActiveTab('instructor');
+    } else if (isAdmin) {
+      setActiveTab('settings');
     } else {
       setActiveTab('courses');
     }
-  }, [isInstructor]);
+  }, [isInstructor, isAdmin]);
+
+  useEffect(() => {
+    const fetchAdminProfile = async () => {
+      if (isAdmin) {
+        try {
+          const { data } = await axios.get('/api/admin/profile');
+          setAdminProfile(data.admin);
+          console.log('data: ', data);
+        } catch (err) {
+          console.error('Error loading admin profile:', err);
+        }
+      }
+    };
+    fetchAdminProfile();
+  }, [isAdmin]);
 
   // Fetch student enrolled courses if user is a student
   useEffect(() => {
@@ -145,6 +172,24 @@ const Profile = () => {
     if (user) fetchInstructorData();
   }, [user, isInstructor]);
 
+  // Handler for image loading errors
+  const handleImageError = (id, type = 'courses') => {
+    if (type === 'profile') {
+      setFailedImages((prev) => ({
+        ...prev,
+        profile: true,
+      }));
+    } else {
+      setFailedImages((prev) => ({
+        ...prev,
+        courses: {
+          ...prev.courses,
+          [id]: true,
+        },
+      }));
+    }
+  };
+
   const instructorData = instructorDetails?.instructeur || null;
 
   return (
@@ -188,7 +233,7 @@ const Profile = () => {
                   </p>
                 </div>
               </>
-            ) : (
+            ) : isStudent ? (
               <>
                 <div className="bg-white rounded-xl shadow-card p-4 border-l-4 border-blue-500">
                   <div className="flex items-center mb-2">
@@ -214,7 +259,7 @@ const Profile = () => {
                   </p>
                 </div>
               </>
-            )}
+            ) : null}
           </div>
         </section>
 
@@ -331,11 +376,18 @@ const Profile = () => {
                         className="bg-white border border-neutral-100 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow"
                       >
                         <div className="relative h-40 overflow-hidden">
-                          <img
-                            src={course.image || '/placeholder-course.jpg'}
-                            alt={course.titre}
-                            className="w-full h-full object-cover transition-transform hover:scale-105"
-                          />
+                          {failedImages.courses[course.id] || !course.image ? (
+                            <div className="w-full h-full flex items-center justify-center bg-neutral-200">
+                              <FiBook className="text-neutral-400 text-4xl" />
+                            </div>
+                          ) : (
+                            <img
+                              src={course.image}
+                              alt={course.titre}
+                              className="w-full h-full object-cover transition-transform hover:scale-105"
+                              onError={() => handleImageError(course.id)}
+                            />
+                          )}
                           <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-3">
                             <span className="text-xs font-medium px-2 py-1 bg-white/90 rounded-full text-primary">
                               {course.categorie?.nom || 'Uncategorized'}
@@ -509,16 +561,18 @@ const Profile = () => {
                           className="border border-neutral-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow"
                         >
                           <div className="h-32 relative bg-neutral-200">
-                            {course.image ? (
+                            {failedImages.courses[course.id] ||
+                            !course.image ? (
+                              <div className="flex items-center justify-center h-full bg-neutral-800">
+                                <FiLayers className="text-white/90 text-4xl" />
+                              </div>
+                            ) : (
                               <img
                                 src={course.image}
                                 alt={course.titre}
                                 className="w-full h-full object-cover"
+                                onError={() => handleImageError(course.id)}
                               />
-                            ) : (
-                              <div className="flex items-center justify-center h-full bg-neutral-800">
-                                <FiLayers className="text-white/90 text-4xl" />
-                              </div>
                             )}
                             <div className="absolute bottom-2 right-2">
                               <span className="text-xs font-medium px-2 py-1 bg-white/90 rounded-full text-primary">
@@ -572,30 +626,34 @@ const Profile = () => {
           {/* Sidebar */}
           <aside className="space-y-6">
             <div className="bg-white rounded-xl shadow-card p-6 text-center">
-              {console.log('Rendering profile image with user data:', {
-                userImage: user?.image,
-                userName: user?.nom,
-                userEmail: user?.email,
-                userRole: user?.role,
-              })}
               <div className="w-24 h-24 mx-auto mb-4 bg-neutral-100 rounded-full flex items-center justify-center overflow-hidden">
-                {user?.image ? (
+                {isAdmin ? (
+                  // Admins get an FiShield icon instead of an image
+                  <FiShield className="text-primary w-10 h-10" />
+                ) : isInstructor &&
+                  instructorData?.image &&
+                  !failedImages.profile ? (
+                  // Instructor image from instructorData
+                  <img
+                    src={instructorData.image}
+                    alt="Instructor Profile"
+                    className="w-full h-full object-cover"
+                    onError={() => handleImageError(null, 'profile')}
+                  />
+                ) : isStudent && user?.image && !failedImages.profile ? (
+                  // Student image from user data
                   <img
                     src={user.image}
-                    alt="Profile"
+                    alt="Student Profile"
                     className="w-full h-full object-cover"
-                    onLoad={() => console.log('User image loaded successfully')}
-                    onError={(e) => {
-                      console.error('Error loading user image:', e);
-                      e.target.onerror = null;
-                      e.target.src =
-                        'https://via.placeholder.com/150?text=User';
-                    }}
+                    onError={() => handleImageError(null, 'profile')}
                   />
                 ) : (
+                  // Fallback icon if no image available
                   <FiUser className="text-primary w-10 h-10" />
                 )}
               </div>
+
               <h3 className="font-heading font-semibold mb-1">
                 {user?.nom || 'User Name'}
               </h3>
@@ -619,7 +677,7 @@ const Profile = () => {
                       <p className="font-semibold">{stats.categoriesCreated}</p>
                     </div>
                   </>
-                ) : (
+                ) : isStudent ? (
                   <>
                     <div className="bg-neutral-50 rounded p-2">
                       <p className="text-xs text-neutral-500">Courses</p>
@@ -632,7 +690,7 @@ const Profile = () => {
                       </p>
                     </div>
                   </>
-                )}
+                ) : null}
               </div>
 
               <button

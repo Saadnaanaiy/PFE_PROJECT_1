@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Cours;
 use App\Models\Categorie;
+use App\Models\Discussion;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
@@ -506,4 +507,18 @@ class CoursController extends Controller
             'data' => $discussion
         ], 201);
     }
+
+public function showDiscussion($courseId, $forumId, $discussionId)
+{
+    $discussion = Discussion::with(['user', 'messages.user'])
+        ->where('id', $discussionId)
+        ->where('forum_id', $forumId)
+        ->firstOrFail();
+
+    return response()->json([
+        'success' => true,
+        'data' => $discussion
+    ]);
+}
+
 }

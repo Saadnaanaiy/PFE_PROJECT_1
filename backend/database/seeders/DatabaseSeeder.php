@@ -3,21 +3,26 @@
 namespace Database\Seeders;
 
 use App\Models\User;
-// use Illuminate\Database\Console\Seeds\WithoutModelEvents;
+use App\Models\Administrateur;
 use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
 {
-    /**
-     * Seed the application's database.
-     */
     public function run(): void
     {
-        // User::factory(10)->create();
-
-        User::factory()->create([
-            'nom' => 'admin',
+        // 1) Create the admin user
+        $user = User::factory()->create([
+            'nom'   => 'admin',
             'email' => 'admin@gmail.com',
+            'role'  => 'administrateur',
+            'image' => 'administrateurs/admin.jpg',
+        ]);
+
+        // 2) Seed the administrateurs table
+        Administrateur::create([
+            'user_id' => $user->id,
+            // you can override image here if desired
+            'image'   => $user->image,
         ]);
     }
 }
