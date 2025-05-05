@@ -50,12 +50,13 @@ export default function DashboardStats({ dashboardData }) {
     // Process courses by price
     if (dashboardData?.courses?.length) {
       const priceRanges = [
-        { name: '0-50 MAD', min: 0, max: 50, count: 0 },
-        { name: '51-100 MAD', min: 51, max: 100, count: 0 },
-        { name: '101-150 MAD', min: 101, max: 150, count: 0 },
-        { name: '151-200 MAD', min: 151, max: 200, count: 0 },
-        { name: '201+ MAD', min: 201, max: Infinity, count: 0 },
+        { name: '0-50 MAD', min: 0, max: 50 },
+        { name: '51-100 MAD', min: 50.01, max: 100 },
+        { name: '101-150 MAD', min: 100.01, max: 150 },
+        { name: '151-200 MAD', min: 150.01, max: 200 },
+        { name: '201+ MAD', min: 200.01, max: Infinity },
       ];
+
       dashboardData.courses.forEach((course) => {
         const price = parseFloat(course.prix) || 0;
         priceRanges.forEach((range) => {
@@ -161,7 +162,7 @@ export default function DashboardStats({ dashboardData }) {
     }
 
     // Courses by price chart
-    if (priceChartRef.current && coursesByPrice.length) {
+    if (priceChartRef.current) {
       if (priceChartInstance.current) priceChartInstance.current.destroy();
       const ctx = priceChartRef.current.getContext('2d');
       priceChartInstance.current = new Chart(ctx, {

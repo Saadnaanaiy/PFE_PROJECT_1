@@ -1,65 +1,121 @@
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import { FiTrash2, FiShoppingBag, FiArrowLeft } from 'react-icons/fi';
 import CartItem from '../components/CartItem';
+import { toast } from 'react-toastify';
 
 const Cart = () => {
   const navigate = useNavigate();
+  const [cartItems, setCartItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // In a real app, this would come from a context or state management
-  const [cartItems, setCartItems] = useState([
-    {
-      id: '1',
-      title: 'Complete Web Development Bootcamp',
-      instructor: 'Dr. Mohammed Bennani',
-      price: 199,
-      originalPrice: 899,
-      quantity: 1,
-      image:
-        'https://images.pexels.com/photos/1181298/pexels-photo-1181298.jpeg?auto=compress&cs=tinysrgb&w=600',
-    },
-    {
-      id: '2',
-      title: 'Arabic Calligraphy Masterclass',
-      instructor: 'Fatima Zahra',
-      price: 149,
-      originalPrice: 499,
-      quantity: 1,
-      image:
-        'https://images.pexels.com/photos/6238297/pexels-photo-6238297.jpeg?auto=compress&cs=tinysrgb&w=600',
-    },
-  ]);
+  // Fetch cart from API
+  useEffect(() => {
+    const fetchCart = async () => {
+      try {
+        setLoading(true);
+        const response = await axios.get('/api/cart');
+        // Log the raw response to better understand its structure
+        console.log('Cart API response:', response.data);
 
-  const updateQuantity = (itemId, newQuantity) => {
+        // Safely map cart items with proper error handling for missing properties
+        setCartItems(
+          response.data.cours.map((item) => {
+            // Get instructor name safely, using a fallback if structure is incomplete
+            let instructorName = 'Unknown Instructor';
+            try {
+              if (
+                item.instructeur &&
+                item.instructeur.user &&
+                item.instructeur.user.nom
+              ) {
+                instructorName = item.instructeur.user.nom;
+              } else if (item.instructeur && item.instructeur.nom) {
+                instructorName = item.instructeur.nom;
+              }
+            } catch (err) {
+              console.warn(
+                `Could not extract instructor name for course ${item.id}`,
+                err,
+              );
+            }
+
+            return {
+              id: item.id,
+              title: item.titre || 'Unnamed Course',
+              instructor: instructorName,
+              price: item.prix || 0,
+              quantity: item.pivot?.quantity || 1,
+              image: item.image || '/placeholder-course.jpg',
+              originalPrice: null,
+            };
+          }),
+        );
+      } catch (err) {
+        console.error('Error fetching cart:', err);
+        setError('Failed to load cart items.');
+        toast.error('Failed to load cart items.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCart();
+  }, []);
+
+  const updateQuantity = async (itemId, newQuantity) => {
     if (newQuantity < 1) return;
-
-    setCartItems(
-      cartItems.map((item) =>
-        item.id === itemId ? { ...item, quantity: newQuantity } : item,
-      ),
-    );
+    try {
+      await axios.post('/api/cart/add', { cours_id: itemId });
+      setCartItems((prev) =>
+        prev.map((item) =>
+          item.id === itemId ? { ...item, quantity: newQuantity } : item,
+        ),
+      );
+    } catch (err) {
+      console.error('Error updating quantity:', err);
+      toast.error('Unable to update quantity');
+    }
   };
 
-  const removeItem = (itemId) => {
-    setCartItems(cartItems.filter((item) => item.id !== itemId));
+  const removeItem = async (itemId) => {
+    try {
+      await axios.delete(`/api/cart/${itemId}`);
+      setCartItems((prev) => prev.filter((item) => item.id !== itemId));
+      toast.info('Item removed');
+    } catch (err) {
+      console.error('Error removing item:', err);
+      toast.error('Unable to remove item');
+    }
   };
 
-  const clearCart = () => {
-    setCartItems([]);
+  const clearCart = async () => {
+    try {
+      await axios.delete('/api/cart');
+      setCartItems([]);
+      toast.info('Cart cleared');
+    } catch (err) {
+      console.error('Error clearing cart:', err);
+      toast.error('Unable to clear cart');
+    }
   };
 
-  // Calculate total
   const subtotal = cartItems.reduce(
     (total, item) => total + item.price * item.quantity,
     0,
   );
-  const tax = subtotal * 0.2; // 20% VAT
+  const tax = subtotal * 0.2;
   const total = subtotal + tax;
+
+  if (loading) return <p className="text-center py-10">Loading cart...</p>;
+  if (error) return <p className="text-red-500 text-center py-10">{error}</p>;
 
   return (
     <div className="bg-neutral-50 py-12 min-h-screen">
       <div className="container-custom">
-        {/* Page Header */}
+        {/* Header */}
         <div className="mb-8 bg-white shadow-sm rounded-lg overflow-hidden">
           <div className="border-b border-neutral-100 px-6 py-5 flex flex-col md:flex-row md:items-center md:justify-between">
             <div>
@@ -79,25 +135,22 @@ const Cart = () => {
                 to="/"
                 className="flex items-center text-primary font-medium hover:text-primary-dark transition-colors"
               >
-                <FiArrowLeft className="mr-2" size={16} />
-                Continue Shopping
+                <FiArrowLeft className="mr-2" size={16} /> Continue Shopping
               </Link>
               {cartItems.length > 0 && (
                 <button
                   onClick={clearCart}
                   className="ml-8 flex items-center text-neutral-600 hover:text-red-500 transition-colors"
                 >
-                  <FiTrash2 className="mr-2" size={16} />
-                  Clear Cart
+                  <FiTrash2 className="mr-2" size={16} /> Clear Cart
                 </button>
               )}
             </div>
           </div>
         </div>
 
-        {/* Cart Content */}
+        {/* Content */}
         <div className="grid md:grid-cols-3 gap-8">
-          {/* Cart Items */}
           <div className="md:col-span-2">
             <div className="bg-white rounded-lg shadow-sm overflow-hidden">
               {cartItems.length > 0 ? (
@@ -134,14 +187,12 @@ const Cart = () => {
             </div>
           </div>
 
-          {/* Order Summary */}
           {cartItems.length > 0 && (
             <div className="md:col-span-1">
               <div className="bg-white rounded-lg shadow-sm p-6 sticky top-24">
                 <h2 className="font-heading text-xl font-semibold mb-6 pb-3 border-b text-neutral-800">
                   Order Summary
                 </h2>
-
                 <div className="space-y-4 text-neutral-600 mb-8">
                   <div className="flex justify-between">
                     <span>Subtotal</span>
@@ -159,14 +210,12 @@ const Cart = () => {
                     <span className="text-primary">{total.toFixed(2)} MAD</span>
                   </div>
                 </div>
-
                 <button
                   onClick={() => navigate('/checkout')}
                   className="btn-primary w-full py-3 rounded-md hover:bg-primary-dark transition-colors font-medium"
                 >
                   Proceed to Checkout
                 </button>
-
                 <div className="mt-6 text-center text-sm text-neutral-500 bg-neutral-50 rounded-md p-3">
                   Secure checkout powered by trusted payment providers
                 </div>

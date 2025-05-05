@@ -11,7 +11,8 @@ class Categorie extends Model
 
     protected $fillable = [
         'nom',
-        'description'
+        'description',
+        "image"
     ];
 
     public function cours()

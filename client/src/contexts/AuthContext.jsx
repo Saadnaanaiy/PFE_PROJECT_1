@@ -3,6 +3,15 @@ import axios from 'axios';
 
 const AuthContext = createContext(null);
 
+// Configure axios defaults globally
+const configureAxiosDefaults = (token) => {
+  if (token) {
+    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+  } else {
+    delete axios.defaults.headers.common['Authorization'];
+  }
+};
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -12,30 +21,38 @@ export const AuthProvider = ({ children }) => {
   // Check if user is authenticated on initial load
   useEffect(() => {
     const checkAuthStatus = async () => {
-      const token =
-        localStorage.getItem('token') || sessionStorage.getItem('token');
+      try {
+        // Get token from storage
+        const token =
+          localStorage.getItem('token') || sessionStorage.getItem('token');
 
-      if (token) {
-        try {
-          // Set the authorization header
-          axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-
-          // Fetch user data
-          const response = await axios.get('http://localhost:8000/api/user');
-          setUser(response.data);
-        } catch (err) {
-          console.error('Authentication check failed:', err);
-          // Clear invalid tokens
-          localStorage.removeItem('token');
-          sessionStorage.removeItem('token');
-          delete axios.defaults.headers.common['Authorization'];
+        if (!token) {
           setUser(null);
+          setLoading(false);
+          return;
         }
-      } else {
-        setUser(null);
-      }
 
-      setLoading(false);
+        // Set up axios with token
+        configureAxiosDefaults(token);
+
+        // Fetch user data
+        const response = await axios.get('http://localhost:8000/api/user');
+
+        if (response.data) {
+          setUser(response.data);
+        } else {
+          throw new Error('No user data returned');
+        }
+      } catch (err) {
+        console.error('Authentication check failed:', err);
+        // Clear invalid tokens
+        localStorage.removeItem('token');
+        sessionStorage.removeItem('token');
+        configureAxiosDefaults(null);
+        setUser(null);
+      } finally {
+        setLoading(false);
+      }
     };
 
     checkAuthStatus();
@@ -43,7 +60,7 @@ export const AuthProvider = ({ children }) => {
 
   // Notify components that cart has been updated
   const cartUpdated = () => {
-    setCartUpdateFlag(prev => prev + 1);
+    setCartUpdateFlag((prev) => prev + 1);
   };
 
   // Login function
@@ -61,9 +78,7 @@ export const AuthProvider = ({ children }) => {
       storage.setItem('token_type', response.data.token_type);
 
       // Set authorization header for future requests
-      axios.defaults.headers.common[
-        'Authorization'
-      ] = `${response.data.token_type} ${response.data.access_token}`;
+      configureAxiosDefaults(`${response.data.access_token}`);
 
       // Fetch user data
       const userResponse = await axios.get('http://localhost:8000/api/user');
@@ -105,7 +120,7 @@ export const AuthProvider = ({ children }) => {
       // Clear tokens and user data regardless of API response
       localStorage.removeItem('token');
       sessionStorage.removeItem('token');
-      delete axios.defaults.headers.common['Authorization'];
+      configureAxiosDefaults(null);
       setUser(null);
     }
   };
@@ -126,7 +141,9 @@ export const AuthProvider = ({ children }) => {
 
   const isStudent = () => {
     // Assuming 'etudiant' or default if role is not admin/instructor
-    return user?.role === 'etudiant' || (!isAdmin() && !isInstructor());
+    return (
+      user?.role === 'etudiant' || (!isAdmin() && !isInstructor() && !!user)
+    );
   };
 
   const value = {
@@ -142,7 +159,7 @@ export const AuthProvider = ({ children }) => {
     isInstructor,
     isStudent,
     cartUpdated,
-    cartUpdateFlag
+    cartUpdateFlag,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

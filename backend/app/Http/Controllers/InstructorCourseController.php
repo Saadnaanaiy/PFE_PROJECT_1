@@ -13,30 +13,42 @@ use Illuminate\Support\Facades\Storage;
 class InstructorCourseController extends Controller
 {
     // List instructor's courses
-    public function index()
-    {
-        $user = Auth::user();
-        $instructeur = $user->instructeur;
+    public function index(Request $request)
+{
+    $user = Auth::user();
+    $instructeur = $user->instructeur;
 
-        if (!$instructeur) {
-            return response()->json([
-                'message' => 'You are not registered as an instructor'
-            ], 403);
-        }
-
-        $cours = $instructeur->cours()->with('categorie')->get();
-
-        $cours->transform(function ($course) {
-            if ($course->image) {
-                $course->image = asset('storage/' . $course->image);
-            }
-            return $course;
-        });
-
+    if (! $instructeur) {
         return response()->json([
-            'courses' => $cours
-        ]);
+            'message' => 'You are not registered as an instructor'
+        ], 403);
     }
+
+    // On part d’une query builder sur les cours de cet instructeur
+    $query = $instructeur->cours()->with('categorie');
+
+    // Si un filtre categorie_id est passé en query string, on l’applique
+    if ($request->has('categorie_id') && $request->categorie_id) {
+        $query->where('categorie_id', $request->categorie_id);
+    }
+
+    // On peut ici ajouter d’autres filtres (search, prix, etc.)
+
+    // Exécution de la requête
+    $cours = $query->get();
+
+    // Transformation éventuelle des URLs d’images
+    $cours->transform(function ($course) {
+        if ($course->image) {
+            $course->image = asset('storage/' . $course->image);
+        }
+        return $course;
+    });
+
+    return response()->json([
+        'courses' => $cours
+    ]);
+}
 
     // Create a new course
     // Create a new course
@@ -209,78 +221,147 @@ class InstructorCourseController extends Controller
 
     // Get all categories
     public function getCategories()
-    {
-        $instructeur = Auth::user()->instructeur;
+{
+    $instructeur = Auth::user()->instructeur;
 
-        if (!$instructeur) {
-            return response()->json([
-                'message' => 'You are not registered as an instructor'
-            ], 403);
+    if (!$instructeur) {
+        return response()->json([
+            'message' => 'You are not registered as an instructor'
+        ], 403);
+    }
+
+    // Fetch categories that have courses by this instructor, and count only those courses
+    $categories = Categorie::whereHas('cours', function ($query) use ($instructeur) {
+        $query->where('instructeur_id', $instructeur->id);
+    })
+    ->withCount(['cours as count' => function ($query) use ($instructeur) {
+        $query->where('instructeur_id', $instructeur->id);
+    }])
+    ->get();
+
+    // Add full image URL
+    foreach ($categories as $category) {
+        if ($category->image) {
+            $category->image = asset('storage/' . $category->image);
+        }
+    }
+
+    return response()->json([
+        'categories' => $categories
+    ]);
+}
+
+
+// Create a new category
+public function storeCategorie(Request $request)
+{
+    $validated = $request->validate([
+        'nom' => 'required|string|max:255|unique:categories,nom',
+        'description' => 'nullable|string|max:1000',
+        'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+    ]);
+
+    // Handle image upload
+    if ($request->hasFile('image')) {
+        $imagePath = $request->file('image')->store('categories', 'public');
+        $validated['image'] = $imagePath;
+    }
+
+    $categorie = Categorie::create($validated);
+
+    // Update the image with the full URL in the response
+    if (isset($validated['image'])) {
+        $categorie->image = asset('storage/' . $validated['image']);
+    }
+
+    return response()->json([
+        'message' => 'Category created successfully.',
+        'categorie' => $categorie,
+    ], 201);
+}
+
+// Update a category
+public function updateCategorie(Request $request, $id)
+{
+    $categorie = Categorie::findOrFail($id);
+
+    $validated = $request->validate([
+        'nom' => 'sometimes|required|string|max:255|unique:categories,nom,' . $id,
+        'description' => 'nullable|string|max:1000',
+        'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+    ]);
+
+    // Handle image upload
+    if ($request->hasFile('image')) {
+        // Delete old image if exists
+        if ($categorie->image && Storage::disk('public')->exists($categorie->image)) {
+            Storage::disk('public')->delete($categorie->image);
         }
 
-        $categories = Categorie::whereHas('cours', function ($query) use ($instructeur) {
-            $query->where('instructeur_id', $instructeur->id);
-        })->get();
-
-        return response()->json([
-            'categories' => $categories
-        ]);
+        $imagePath = $request->file('image')->store('categories', 'public');
+        $validated['image'] = $imagePath;
     }
 
-    // Create a new category
-    public function storeCategorie(Request $request)
-    {
-        $validated = $request->validate([
-            'nom' => 'required|string|max:255|unique:categories,nom',
-            'description' => 'nullable|string|max:1000',
-        ]);
+    $categorie->update($validated);
 
-        $categorie = Categorie::create($validated);
-
-        return response()->json([
-            'message' => 'Category created successfully.',
-            'categorie' => $categorie,
-        ], 201);
+    // Update image with full URL for response
+    if ($categorie->image) {
+        $categorie->image = asset('storage/' . $categorie->image);
     }
 
-    // Update a category
-    public function updateCategorie(Request $request, $id)
-    {
-        $categorie = Categorie::findOrFail($id);
+    return response()->json([
+        'message' => 'Category updated successfully.',
+        'categorie' => $categorie,
+    ]);
+}
 
-        $validated = $request->validate([
-            'nom' => 'sometimes|required|string|max:255|unique:categories,nom,' . $id,
-            'description' => 'nullable|string|max:1000',
-        ]);
+// Delete a category
+public function destroyCategorie($id)
+{
+    $categorie = Categorie::findOrFail($id);
 
-        $categorie->update($validated);
+    // Check if any courses are using this category
+    $coursesCount = Cours::where('categorie_id', $id)->count();
 
+    if ($coursesCount > 0) {
         return response()->json([
-            'message' => 'Category updated successfully.',
-            'categorie' => $categorie,
-        ]);
+            'message' => 'Cannot delete category. It is associated with ' . $coursesCount . ' course(s).',
+        ], 409); // Conflict status code
     }
 
-    // Delete a category
-    public function destroyCategorie($id)
-    {
-        $categorie = Categorie::findOrFail($id);
-
-        // Check if any courses are using this category
-        $coursesCount = Cours::where('categorie_id', $id)->count();
-
-        if ($coursesCount > 0) {
-            return response()->json([
-                'message' => 'Cannot delete category. It is associated with ' . $coursesCount . ' course(s).',
-            ], 409); // Conflict status code
-        }
-
-        $categorie->delete();
-
-        return response()->json([
-            'message' => 'Category deleted successfully.'
-        ]);
+    // Delete the category image if it exists
+    if ($categorie->image && Storage::disk('public')->exists($categorie->image)) {
+        Storage::disk('public')->delete($categorie->image);
     }
+
+    $categorie->delete();
+
+    return response()->json([
+        'message' => 'Category deleted successfully.'
+    ]);
+}
+
+ public function showCategorie($id)
+{
+    $categorie = Categorie::withCount('cours')->find($id);
+
+    if (! $categorie) {
+        return response()->json([
+            'message' => 'Category not found.'
+        ], 404);
+    }
+
+    // Prefix image URL if needed
+    if ($categorie->image) {
+        $categorie->image = asset('storage/' . $categorie->image);
+    }
+
+    return response()->json([
+        'categorie' => $categorie
+    ]);
+}
+
+
 
 
 

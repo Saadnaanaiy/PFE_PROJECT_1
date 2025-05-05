@@ -8,31 +8,121 @@ import {
   FiUser,
   FiLogOut,
 } from 'react-icons/fi';
-// Import graduation cap icon and admin shield icon
 import { FaGraduationCap, FaShieldAlt } from 'react-icons/fa';
 import Logo from './Logo';
 import { useAuth } from '../contexts/AuthContext';
 import { getCartItems } from '../services/cartService';
+import axios from 'axios';
 
 const Header = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [cartItemsCount, setCartItemsCount] = useState(0);
-  const { user, isAuthenticated, logout, isInstructor, isAdmin, cartUpdateFlag } = useAuth();
+  const [localAuthState, setLocalAuthState] = useState({
+    isAuthenticated: false,
+    userData: null,
+    userRole: null,
+    isLoading: true,
+  });
+
+  const {
+    user,
+    loading,
+    isAuthenticated,
+    logout,
+    isInstructor,
+    isAdmin,
+    cartUpdateFlag,
+  } = useAuth();
   const navigate = useNavigate();
 
   // Handle scroll effect
-  if (typeof window !== 'undefined') {
-    window.addEventListener('scroll', () => {
+  useEffect(() => {
+    const handleScroll = () => {
       setIsScrolled(window.scrollY > 20);
-    });
-  }
+    };
 
-  // Fetch cart items count when component mounts, authentication changes, or cart is updated
+    window.addEventListener('scroll', handleScroll);
+    handleScroll();
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, []);
+
+  // Enhanced authentication check that works independently
+  useEffect(() => {
+    const checkAuthDirectly = async () => {
+      try {
+        // First check if we have a token
+        const token =
+          localStorage.getItem('token') || sessionStorage.getItem('token');
+
+        if (!token) {
+          setLocalAuthState({
+            isAuthenticated: false,
+            userData: null,
+            userRole: null,
+            isLoading: false,
+          });
+          return;
+        }
+
+        // Try to fetch user data directly with the token
+        const response = await axios.get('http://localhost:8000/api/user', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (response.data) {
+          setLocalAuthState({
+            isAuthenticated: true,
+            userData: response.data,
+            userRole: response.data.role,
+            isLoading: false,
+          });
+        } else {
+          throw new Error('No user data returned');
+        }
+      } catch (err) {
+        console.error('Direct auth check failed:', err);
+        setLocalAuthState({
+          isAuthenticated: false,
+          userData: null,
+          userRole: null,
+          isLoading: false,
+        });
+      }
+    };
+
+    // First try to use context auth data if available
+    if (!loading && user) {
+      setLocalAuthState({
+        isAuthenticated: true,
+        userData: user,
+        userRole: user.role,
+        isLoading: false,
+      });
+    }
+    // If context auth is done loading but no user, try direct check
+    else if (!loading && !user) {
+      checkAuthDirectly();
+    }
+    // If context is still loading, set local loading state
+    else {
+      setLocalAuthState((prev) => ({ ...prev, isLoading: true }));
+    }
+  }, [user, loading]);
+
+  // Fetch cart items when auth state changes
   useEffect(() => {
     const fetchCartCount = async () => {
-      if (isAuthenticated() && !isInstructor() && !isAdmin()) {
+      const isStudent =
+        localAuthState.isAuthenticated &&
+        localAuthState.userRole !== 'administrateur' &&
+        localAuthState.userRole !== 'instructeur';
+
+      if (isStudent) {
         try {
           const items = await getCartItems();
           setCartItemsCount(items.length);
@@ -45,35 +135,68 @@ const Header = () => {
       }
     };
 
-    fetchCartCount();
-  }, [isAuthenticated, isInstructor, isAdmin, cartUpdateFlag]);
+    if (!localAuthState.isLoading) {
+      fetchCartCount();
+    }
+  }, [localAuthState, cartUpdateFlag]);
 
   const handleLogout = async () => {
     await logout();
+    setLocalAuthState({
+      isAuthenticated: false,
+      userData: null,
+      userRole: null,
+      isLoading: false,
+    });
     navigate('/');
+  };
+
+  // Local role checking functions that don't depend on context
+  const checkIsAdmin = () => {
+    return localAuthState.userRole === 'administrateur';
+  };
+
+  const checkIsInstructor = () => {
+    return localAuthState.userRole === 'instructeur';
   };
 
   // Get the appropriate icon based on user role
   const getUserRoleIcon = () => {
-    if (isAdmin()) {
-      return <FaShieldAlt className="w-4 h-4 text-primary" />; // Shield icon for admins
-    } else if (isInstructor()) {
-      return <FaGraduationCap className="w-4 h-4 text-primary" />; // Graduation cap for instructors
+    if (checkIsAdmin()) {
+      return <FaShieldAlt className="w-4 h-4 text-primary" />;
+    } else if (checkIsInstructor()) {
+      return <FaGraduationCap className="w-4 h-4 text-primary" />;
     } else {
-      return <FiUser className="w-4 h-4 text-primary" />; // Default user icon for students
+      return <FiUser className="w-4 h-4 text-primary" />;
     }
   };
 
   // Get role display text
   const getUserRoleText = () => {
-    if (isAdmin()) {
+    if (checkIsAdmin()) {
       return 'Administrator';
-    } else if (isInstructor()) {
+    } else if (checkIsInstructor()) {
       return 'Instructor';
     } else {
       return 'Student';
     }
   };
+
+  // If still loading auth state, show a simple loading state
+  if (localAuthState.isLoading) {
+    return (
+      <header className="sticky top-0 z-50 bg-white shadow-md">
+        <nav className="container-custom py-4">
+          <div className="flex items-center justify-between">
+            <Link to="/" className="flex-shrink-0">
+              <Logo className="h-10 w-auto" />
+            </Link>
+            <div className="animate-pulse w-24 h-8 bg-neutral-200 rounded"></div>
+          </div>
+        </nav>
+      </header>
+    );
+  }
 
   return (
     <header
@@ -101,7 +224,7 @@ const Header = () => {
 
             <div className="flex items-center space-x-6">
               {/* Don't show category/course/instructor links for admin */}
-              {!(isAuthenticated() && isAdmin()) && (
+              {!(localAuthState.isAuthenticated && checkIsAdmin()) && (
                 <>
                   <Link
                     to="/categories"
@@ -116,7 +239,7 @@ const Header = () => {
                     Courses
                   </Link>
                   {/* Conditionally show Instructors link or Dashboard link */}
-                  {isAuthenticated() && isInstructor() ? (
+                  {localAuthState.isAuthenticated && checkIsInstructor() ? (
                     <Link
                       to="/instructor/dashboard"
                       className="text-neutral-800 hover:text-primary font-medium"
@@ -136,10 +259,10 @@ const Header = () => {
             </div>
 
             <div className="flex items-center space-x-4">
-              {isAuthenticated() ? (
+              {localAuthState.isAuthenticated ? (
                 <>
                   {/* Cart Icon (Hide for admins and instructors) */}
-                  {!isInstructor() && !isAdmin() && (
+                  {!checkIsInstructor() && !checkIsAdmin() && (
                     <Link to="/cart" className="relative">
                       <FiShoppingCart className="w-6 h-6 text-neutral-800 hover:text-primary" />
                       {cartItemsCount > 0 && (
@@ -158,7 +281,9 @@ const Header = () => {
                       <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
                         {getUserRoleIcon()}
                       </div>
-                      <span className="font-medium">{user?.nom || 'User'}</span>
+                      <span className="font-medium">
+                        {localAuthState.userData?.nom || 'User'}
+                      </span>
                     </button>
 
                     {isProfileMenuOpen && (
@@ -170,7 +295,7 @@ const Header = () => {
                             </div>
                             <div>
                               <p className="text-sm font-medium">
-                                {user?.nom || 'User'}
+                                {localAuthState.userData?.nom || 'User'}
                               </p>
                               <p className="text-xs text-neutral-500">
                                 {getUserRoleText()}
@@ -186,7 +311,7 @@ const Header = () => {
                           Profile
                         </Link>
                         {/* Show appropriate dashboard link based on role */}
-                        {isAdmin() && (
+                        {checkIsAdmin() && (
                           <Link
                             to="/admin/dashboard"
                             className="block px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-100"
@@ -195,7 +320,7 @@ const Header = () => {
                             Admin Dashboard
                           </Link>
                         )}
-                        {isInstructor() && !isAdmin() && (
+                        {checkIsInstructor() && !checkIsAdmin() && (
                           <Link
                             to="/instructor/dashboard"
                             className="block px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-100"
@@ -233,16 +358,18 @@ const Header = () => {
 
           {/* Mobile menu button */}
           <div className="flex items-center md:hidden">
-            {isAuthenticated() && !isAdmin() && !isInstructor() && (
-              <Link to="/cart" className="relative mr-4">
-                <FiShoppingCart className="w-6 h-6 text-neutral-800" />
-                {cartItemsCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-secondary text-white text-xs font-bold rounded-full h-4 w-4 flex items-center justify-center">
-                    {cartItemsCount}
-                  </span>
-                )}
-              </Link>
-            )}
+            {localAuthState.isAuthenticated &&
+              !checkIsAdmin() &&
+              !checkIsInstructor() && (
+                <Link to="/cart" className="relative mr-4">
+                  <FiShoppingCart className="w-6 h-6 text-neutral-800" />
+                  {cartItemsCount > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-secondary text-white text-xs font-bold rounded-full h-4 w-4 flex items-center justify-center">
+                      {cartItemsCount}
+                    </span>
+                  )}
+                </Link>
+              )}
             <button
               onClick={() => setIsOpen(!isOpen)}
               className="text-neutral-800"
@@ -260,14 +387,16 @@ const Header = () => {
         {/* Mobile Navigation */}
         {isOpen && (
           <div className="md:hidden mt-4 animate-fadeIn">
-            {isAuthenticated() && (
+            {localAuthState.isAuthenticated && (
               <div className="px-4 py-3 border-b border-neutral-200 mb-4">
                 <div className="flex items-center">
                   <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center mr-2">
                     {getUserRoleIcon()}
                   </div>
                   <div>
-                    <p className="font-medium">{user?.nom || 'User'}</p>
+                    <p className="font-medium">
+                      {localAuthState.userData?.nom || 'User'}
+                    </p>
                     <p className="text-xs text-neutral-500">
                       {getUserRoleText()}
                     </p>
@@ -285,7 +414,7 @@ const Header = () => {
             </div>
             <div className="flex flex-col space-y-4 pb-4">
               {/* Don't show these links for admin in mobile view either */}
-              {!(isAuthenticated() && isAdmin()) && (
+              {!(localAuthState.isAuthenticated && checkIsAdmin()) && (
                 <>
                   <Link
                     to="/categories"
@@ -302,7 +431,7 @@ const Header = () => {
                     Courses
                   </Link>
                   {/* Conditional Mobile Link */}
-                  {isAuthenticated() && isInstructor() ? (
+                  {localAuthState.isAuthenticated && checkIsInstructor() ? (
                     <Link
                       to="/instructor/dashboard"
                       className="text-neutral-800 hover:text-primary font-medium px-1 py-2 border-b border-neutral-200"
@@ -322,10 +451,10 @@ const Header = () => {
                 </>
               )}
 
-              {isAuthenticated() ? (
+              {localAuthState.isAuthenticated ? (
                 <>
                   {/* Cart Link for Mobile */}
-                  {!isInstructor() && !isAdmin() && (
+                  {!checkIsInstructor() && !checkIsAdmin() && (
                     <Link
                       to="/cart"
                       className="text-neutral-800 hover:text-primary font-medium px-1 py-2 border-b border-neutral-200"
@@ -343,7 +472,7 @@ const Header = () => {
                     Profile
                   </Link>
                   {/* Admin Dashboard Link (Mobile) */}
-                  {isAdmin() && (
+                  {checkIsAdmin() && (
                     <Link
                       to="/admin/dashboard"
                       className="text-neutral-800 hover:text-primary font-medium px-1 py-2 border-b border-neutral-200"

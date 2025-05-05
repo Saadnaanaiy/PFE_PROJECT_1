@@ -24,6 +24,7 @@ import CreateCourse from './pages/CreateCourse';
 import CourseEdit from './pages/CourseEdit';
 import AdminDashboard from './pages/AdminDashboard';
 import { ToastContainer } from 'react-toastify';
+import CategorieDetaille from './pages/CategorieDetaille';
 
 
 // Define InstructorRoute component
@@ -91,6 +92,7 @@ function App() {
             <Route path="/course/:courseId" element={<CourseDetails />} />
             <Route path="/courses" element={<CoursesList />} />
             <Route path="/categories" element={<CategoriesList />} />
+            <Route path="/categories/:id" element={<CategorieDetaille />} />
             <Route
               path="/categories/:categoryId"
               element={<CategoryCourses />}

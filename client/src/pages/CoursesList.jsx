@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { FiFilter, FiSearch, FiGrid, FiList, FiClock } from 'react-icons/fi';
+import { FiSearch, FiFilter, FiGrid, FiList, FiClock } from 'react-icons/fi';
 import CourseCard from '../components/CourseCard';
 import moroccanPattern from '../assets/moroccan-pattern.svg';
 import axios from 'axios';
@@ -19,13 +19,9 @@ const getLevelColor = (niveau) => {
   }
 };
 
-// Function to fix duplicate URL prefixes in image paths
 const fixImagePath = (imagePath) => {
-  if (!imagePath) return '';
-
-  // Remove duplicate "http://localhost:8000/storage/" prefix
   const storagePrefix = 'http://localhost:8000/storage/';
-  if (imagePath.includes(storagePrefix + storagePrefix)) {
+  if (imagePath && imagePath.includes(storagePrefix + storagePrefix)) {
     return imagePath.replace(storagePrefix + storagePrefix, storagePrefix);
   }
   return imagePath;
@@ -55,17 +51,13 @@ const CoursesList = () => {
           axios.get('/api/categories'),
         ]);
         const coursesData = coursesRes.data.data.data.map((course) => {
-          // Add dureeHeures (hours) property using the French naming convention to match CourseCard
           return {
             ...course,
-            dureeHeures: (course.dureeMinutes / 60).toFixed(1), // Convert minutes to hours with 1 decimal place
+            dureeHeures: (course.dureeMinutes / 60).toFixed(1),
           };
         });
         setCourses(coursesData);
         setCategories(categoriesRes.data.data);
-
-        console.log('courses', coursesData);
-        console.log('categories', categoriesRes.data.data);
         setError(null);
       } catch (err) {
         setError('Failed to fetch courses. Please try again later.');
@@ -80,7 +72,6 @@ const CoursesList = () => {
 
   // Filter courses based on all criteria
   const filteredCourses = courses.filter((course) => {
-    // Search term filter
     const matchesSearch =
       course.titre.toLowerCase().includes(searchTerm.toLowerCase()) ||
       course.instructeur?.user?.nom
@@ -88,11 +79,9 @@ const CoursesList = () => {
         .includes(searchTerm.toLowerCase()) ||
       course.categorie?.nom.toLowerCase().includes(searchTerm.toLowerCase());
 
-    // Category filter
     const matchesCategory =
       !selectedCategory || course.categorie_id === parseInt(selectedCategory);
 
-    // Price filter
     let matchesPrice = true;
     if (selectedPrice) {
       switch (selectedPrice) {
@@ -111,17 +100,18 @@ const CoursesList = () => {
         case 'over-200':
           matchesPrice = course.prix > 200;
           break;
+        default:
+          break;
       }
     }
 
-    // Rating filter
     const matchesRating =
       !selectedRating || course.rating >= parseFloat(selectedRating);
 
     return matchesSearch && matchesCategory && matchesPrice && matchesRating;
   });
 
-  // Sort courses
+  // Sort courses based on selected sort option
   const sortedCourses = [...filteredCourses].sort((a, b) => {
     switch (selectedSort) {
       case 'newest':
@@ -166,7 +156,6 @@ const CoursesList = () => {
 
   return (
     <div className="min-h-screen bg-neutral-50 py-12 relative">
-      {/* Decorative background elements */}
       <div
         className="absolute top-0 left-0 w-full h-64 overflow-hidden z-0"
         style={{
@@ -179,7 +168,6 @@ const CoursesList = () => {
       <div className="absolute top-0 left-0 w-full h-64 bg-gradient-to-b from-primary/10 to-transparent z-0"></div>
 
       <div className="container-custom relative z-10">
-        {/* Page Header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -389,61 +377,23 @@ const CoursesList = () => {
                         >
                           {course.niveau}
                         </span>
-                        <span className="mx-1.5 text-neutral-300">•</span>
-                        <span className="flex items-center">
-                          <FiClock className="mr-1" />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <FiClock className="text-neutral-400" />
+                        <p className="text-neutral-500">
                           {course.dureeHeures} hours
-                        </span>
+                        </p>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <div className="text-2xl font-bold text-secondary">
-                        {course.prix} MAD
+                    <div className="flex flex-col items-end justify-between">
+                      <div className="text-xl font-semibold text-primary">
+                        {course.prix === 0 ? 'Free' : `${course.prix} MAD`}
                       </div>
-                      {course.prix_original && (
-                        <div className="text-sm line-through text-neutral-500">
-                          {course.prix_original} MAD
-                        </div>
-                      )}
                     </div>
-                  </div>
-                  <div className="flex justify-between items-center mt-4">
-                    <span className="inline-block px-3 py-1 bg-primary/10 text-primary rounded-full text-sm">
-                      {course.categorie?.nom}
-                    </span>
-                    <Link
-                      to={`/course/${course.id}`}
-                      className="btn-primary px-4 py-2"
-                    >
-                      View Course
-                    </Link>
                   </div>
                 </div>
               </div>
             ))}
-          </div>
-        )}
-
-        {/* No Results */}
-        {sortedCourses.length === 0 && (
-          <div className="text-center py-12">
-            <h3 className="text-xl font-medium mb-2">No courses found</h3>
-            <p className="text-neutral-600 mb-6">
-              Try adjusting your search or filter criteria
-            </p>
-            <button
-              onClick={() => {
-                setSearchTerm('');
-                setSelectedCategory('');
-                setSelectedPrice('');
-                setSelectedRating('');
-                setSelectedSort('popular');
-                setFilterOpen(false);
-              }}
-              className="btn-primary px-6 py-2"
-            >
-              Clear Filters
-            </button>
           </div>
         )}
       </div>

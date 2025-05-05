@@ -1,5 +1,13 @@
-import { useState, useEffect } from 'react';
-import { FiPlus, FiCheck, FiX, FiEdit2, FiTrash2 } from 'react-icons/fi';
+import { useState, useEffect, useRef } from 'react';
+import {
+  FiPlus,
+  FiCheck,
+  FiX,
+  FiEdit2,
+  FiTrash2,
+  FiUpload,
+  FiImage,
+} from 'react-icons/fi';
 import axios from 'axios';
 
 const CategoryManagement = ({
@@ -12,16 +20,27 @@ const CategoryManagement = ({
   );
   const [showAddForm, setShowAddForm] = useState(false);
   const [showEditForm, setShowEditForm] = useState(false);
-  const [newCategory, setNewCategory] = useState({ nom: '', description: '' });
+  const [newCategory, setNewCategory] = useState({
+    nom: '',
+    description: '',
+    image: null,
+  });
   const [editCategory, setEditCategory] = useState({
     id: null,
     nom: '',
     description: '',
+    image: null,
+    currentImage: null,
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
+  const [editImagePreview, setEditImagePreview] = useState(null);
+
+  const fileInputRef = useRef(null);
+  const editFileInputRef = useRef(null);
 
   // Fetch categories on component mount
   useEffect(() => {
@@ -40,6 +59,7 @@ const CategoryManagement = ({
       setLoading(true);
       const response = await axios.get('/api/instructor/categories');
       setCategories(response.data.categories);
+      console.log('categories: ', response.data.categories);
 
       // If we have categories but no selection, select the first one
       if (response.data.categories.length > 0 && !selectedCategory) {
@@ -66,9 +86,24 @@ const CategoryManagement = ({
 
     try {
       setLoading(true);
+
+      // Create FormData to handle file upload
+      const formData = new FormData();
+      formData.append('nom', newCategory.nom);
+      formData.append('description', newCategory.description || '');
+
+      if (newCategory.image) {
+        formData.append('image', newCategory.image);
+      }
+
       const response = await axios.post(
         '/api/instructor/categories',
-        newCategory,
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        },
       );
 
       // Add new category to state
@@ -80,7 +115,8 @@ const CategoryManagement = ({
       if (onCategoryAdded) onCategoryAdded(createdCategory.id);
 
       // Reset form
-      setNewCategory({ nom: '', description: '' });
+      setNewCategory({ nom: '', description: '', image: null });
+      setImagePreview(null);
       setShowAddForm(false);
       setSuccess('Category created successfully');
 
@@ -106,9 +142,27 @@ const CategoryManagement = ({
 
     try {
       setLoading(true);
-      const response = await axios.put(
+
+      // Create FormData to handle file upload
+      const formData = new FormData();
+      formData.append('nom', editCategory.nom);
+      formData.append('description', editCategory.description || '');
+
+      if (editCategory.image) {
+        formData.append('image', editCategory.image);
+      }
+
+      // For PUT requests with FormData, may need to use the _method parameter
+      formData.append('_method', 'PUT');
+
+      const response = await axios.post(
         `/api/instructor/categories/${editCategory.id}`,
-        { nom: editCategory.nom, description: editCategory.description },
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        },
       );
 
       // Update category in state
@@ -120,7 +174,14 @@ const CategoryManagement = ({
       );
 
       // Reset form
-      setEditCategory({ id: null, nom: '', description: '' });
+      setEditCategory({
+        id: null,
+        nom: '',
+        description: '',
+        image: null,
+        currentImage: null,
+      });
+      setEditImagePreview(null);
       setShowEditForm(false);
       setSuccess('Category updated successfully');
 
@@ -186,7 +247,17 @@ const CategoryManagement = ({
       id: category.id,
       nom: category.nom,
       description: category.description || '',
+      image: null,
+      currentImage: category.image || null,
     });
+
+    // Set image preview if category has an image
+    if (category.image) {
+      setEditImagePreview(category.image);
+    } else {
+      setEditImagePreview(null);
+    }
+
     setShowEditForm(true);
   };
 
@@ -203,12 +274,68 @@ const CategoryManagement = ({
     }
   };
 
+  const handleImageChange = (e, formType) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Check if the file is an image
+    if (!file.type.startsWith('image/')) {
+      setError('Please select an image file');
+      return;
+    }
+
+    // Check file size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      setError('Image size should be less than 2MB');
+      return;
+    }
+
+    // Create preview
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      if (formType === 'add') {
+        setImagePreview(reader.result);
+        setNewCategory({ ...newCategory, image: file });
+      } else {
+        setEditImagePreview(reader.result);
+        setEditCategory({ ...editCategory, image: file });
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const triggerFileInput = (formType) => {
+    if (formType === 'add') {
+      fileInputRef.current.click();
+    } else {
+      editFileInputRef.current.click();
+    }
+  };
+
   const resetForms = () => {
     setShowAddForm(false);
     setShowEditForm(false);
-    setNewCategory({ nom: '', description: '' });
-    setEditCategory({ id: null, nom: '', description: '' });
+    setNewCategory({ nom: '', description: '', image: null });
+    setEditCategory({
+      id: null,
+      nom: '',
+      description: '',
+      image: null,
+      currentImage: null,
+    });
+    setImagePreview(null);
+    setEditImagePreview(null);
     setError(null);
+  };
+
+  const removeImage = (formType) => {
+    if (formType === 'add') {
+      setImagePreview(null);
+      setNewCategory({ ...newCategory, image: null });
+    } else {
+      setEditImagePreview(null);
+      setEditCategory({ ...editCategory, image: null, currentImage: null });
+    }
   };
 
   return (
@@ -289,6 +416,55 @@ const CategoryManagement = ({
             />
           </div>
 
+          <div className="mb-4">
+            <label
+              htmlFor="image"
+              className="block text-sm font-medium text-neutral-700 mb-1"
+            >
+              Category Image (Optional)
+            </label>
+
+            <input
+              type="file"
+              id="image"
+              name="image"
+              ref={fileInputRef}
+              onChange={(e) => handleImageChange(e, 'add')}
+              className="hidden"
+              accept="image/*"
+            />
+
+            {imagePreview ? (
+              <div className="relative w-full md:w-1/2 lg:w-1/3 border border-neutral-300 rounded-lg overflow-hidden mb-2">
+                <img
+                  src={imagePreview}
+                  alt="Category preview"
+                  className="w-full h-auto object-cover"
+                />
+                <button
+                  type="button"
+                  onClick={() => removeImage('add')}
+                  className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full hover:bg-red-600"
+                  title="Remove image"
+                >
+                  <FiX size={16} />
+                </button>
+              </div>
+            ) : (
+              <div
+                onClick={() => triggerFileInput('add')}
+                className="w-full md:w-1/2 lg:w-1/3 border-2 border-dashed border-neutral-300 rounded-lg p-6 flex flex-col items-center justify-center cursor-pointer hover:border-primary"
+              >
+                <FiImage size={32} className="text-neutral-400 mb-2" />
+                <p className="text-sm text-neutral-500 text-center">
+                  Click to upload an image
+                  <br />
+                  <span className="text-xs">PNG, JPG, JPEG (max 2MB)</span>
+                </p>
+              </div>
+            )}
+          </div>
+
           <div className="flex justify-end">
             <button
               type="submit"
@@ -352,12 +528,72 @@ const CategoryManagement = ({
             />
           </div>
 
+          <div className="mb-4">
+            <label
+              htmlFor="edit-image"
+              className="block text-sm font-medium text-neutral-700 mb-1"
+            >
+              Category Image (Optional)
+            </label>
+
+            <input
+              type="file"
+              id="edit-image"
+              name="image"
+              ref={editFileInputRef}
+              onChange={(e) => handleImageChange(e, 'edit')}
+              className="hidden"
+              accept="image/*"
+            />
+
+            {editImagePreview ? (
+              <div className="relative w-full md:w-1/2 lg:w-1/3 border border-neutral-300 rounded-lg overflow-hidden mb-2">
+                <img
+                  src={
+                    editImagePreview.startsWith('data:')
+                      ? editImagePreview
+                      : `${editImagePreview}`
+                  }
+                  alt="Category preview"
+                  className="w-full h-auto object-cover"
+                />
+                <button
+                  type="button"
+                  onClick={() => removeImage('edit')}
+                  className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full hover:bg-red-600"
+                  title="Remove image"
+                >
+                  <FiX size={16} />
+                </button>
+              </div>
+            ) : (
+              <div
+                onClick={() => triggerFileInput('edit')}
+                className="w-full md:w-1/2 lg:w-1/3 border-2 border-dashed border-neutral-300 rounded-lg p-6 flex flex-col items-center justify-center cursor-pointer hover:border-primary"
+              >
+                <FiImage size={32} className="text-neutral-400 mb-2" />
+                <p className="text-sm text-neutral-500 text-center">
+                  Click to upload an image
+                  <br />
+                  <span className="text-xs">PNG, JPG, JPEG (max 2MB)</span>
+                </p>
+              </div>
+            )}
+          </div>
+
           <div className="flex justify-end gap-3">
             <button
               type="button"
               onClick={() => {
                 setShowEditForm(false);
-                setEditCategory({ id: null, nom: '', description: '' });
+                setEditCategory({
+                  id: null,
+                  nom: '',
+                  description: '',
+                  image: null,
+                  currentImage: null,
+                });
+                setEditImagePreview(null);
               }}
               className="px-4 py-2 border border-neutral-300 rounded-lg hover:bg-neutral-50"
             >
@@ -393,56 +629,79 @@ const CategoryManagement = ({
             categories.map((category) => (
               <div
                 key={category.id}
-                className={`px-4 py-3 rounded-lg transition-all ${
+                className={`relative rounded-lg transition-all overflow-hidden ${
                   selectedCategory === category.id
-                    ? 'bg-primary text-white shadow-lg'
-                    : 'bg-white text-neutral-700 hover:bg-neutral-100 shadow-card'
+                    ? 'ring-2 ring-primary shadow-lg'
+                    : 'hover:bg-neutral-100 shadow-card'
                 }`}
               >
-                <div className="flex justify-between items-start mb-2">
+                {/* Category Image */}
+                {category.image && (
                   <div
-                    className="font-medium cursor-pointer flex-grow"
+                    className="h-24 bg-neutral-100 overflow-hidden cursor-pointer"
                     onClick={() => handleCategorySelect(category.id)}
                   >
-                    {category.nom}
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => handleEditClick(category)}
-                      className={`p-1 rounded-full ${
-                        selectedCategory === category.id
-                          ? 'text-white/80 hover:text-white hover:bg-white/10'
-                          : 'text-neutral-500 hover:text-primary hover:bg-neutral-100'
-                      }`}
-                      title="Edit category"
-                    >
-                      <FiEdit2 size={16} />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteClick(category.id)}
-                      className={`p-1 rounded-full ${
-                        selectedCategory === category.id
-                          ? 'text-white/80 hover:text-white hover:bg-white/10'
-                          : 'text-neutral-500 hover:text-red-500 hover:bg-neutral-100'
-                      }`}
-                      title="Delete category"
-                    >
-                      <FiTrash2 size={16} />
-                    </button>
-                  </div>
-                </div>
-                {category.description && (
-                  <div
-                    className={`text-xs mt-1 line-clamp-2 ${
-                      selectedCategory === category.id
-                        ? 'text-white/80'
-                        : 'text-neutral-500'
-                    }`}
-                    onClick={() => handleCategorySelect(category.id)}
-                  >
-                    {category.description}
+                    <img
+                      src={`${category.image}`}
+                      alt={category.nom}
+                      className="w-full h-full object-cover"
+                    />
                   </div>
                 )}
+
+                {/* Category Content */}
+                <div
+                  className={`px-4 py-3 ${
+                    selectedCategory === category.id
+                      ? 'bg-primary text-white'
+                      : 'bg-white text-neutral-700'
+                  }`}
+                >
+                  <div className="flex justify-between items-start mb-2">
+                    <div
+                      className="font-medium cursor-pointer flex-grow"
+                      onClick={() => handleCategorySelect(category.id)}
+                    >
+                      {category.nom}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => handleEditClick(category)}
+                        className={`p-1 rounded-full ${
+                          selectedCategory === category.id
+                            ? 'text-white/80 hover:text-white hover:bg-white/10'
+                            : 'text-neutral-500 hover:text-primary hover:bg-neutral-100'
+                        }`}
+                        title="Edit category"
+                      >
+                        <FiEdit2 size={16} />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteClick(category.id)}
+                        className={`p-1 rounded-full ${
+                          selectedCategory === category.id
+                            ? 'text-white/80 hover:text-white hover:bg-white/10'
+                            : 'text-neutral-500 hover:text-red-500 hover:bg-neutral-100'
+                        }`}
+                        title="Delete category"
+                      >
+                        <FiTrash2 size={16} />
+                      </button>
+                    </div>
+                  </div>
+                  {category.description && (
+                    <div
+                      className={`text-xs mt-1 line-clamp-2 ${
+                        selectedCategory === category.id
+                          ? 'text-white/80'
+                          : 'text-neutral-500'
+                      }`}
+                      onClick={() => handleCategorySelect(category.id)}
+                    >
+                      {category.description}
+                    </div>
+                  )}
+                </div>
               </div>
             ))
           ) : (

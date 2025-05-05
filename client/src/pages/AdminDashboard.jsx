@@ -97,7 +97,7 @@ function AdminDashboard() {
 
     const fetchUserData = async () => {
       try {
-        const response = await axios.get('/api/user/profile');
+        const response = await axios.get('/api/admin/profile');
         setUser(response.data);
       } catch (err) {
         console.error('Error fetching user data:', err);

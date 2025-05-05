@@ -1,10 +1,12 @@
 <?php
 
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\CategorieController;
 use App\Http\Controllers\CoursController;
 use App\Http\Controllers\InstructorCourseController;
 use App\Http\Controllers\InstructorLessonController;
 use App\Http\Controllers\MessageController;
+use App\Http\Controllers\PanierController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\AdministrateurController;
 use Illuminate\Support\Facades\Route;
@@ -18,6 +20,13 @@ Route::get('/courses', [CoursController::class, 'index']);
 Route::get('/courses/{id}', [CoursController::class, 'show']);
 Route::get('/categories', [CoursController::class, 'getCategories']);
 Route::get('/courses/{id}/forums', [CoursController::class, 'getForums']);
+// Public : toutes les catégories
+Route::get('/categories', [CategorieController::class, 'index']);
+// Public : détail d’une catégorie
+Route::get('/categories/{id}', [CategorieController::class, 'show']);
+// Public : cours d’une catégorie
+Route::get('/categories/{id}/courses', [CoursController::class, 'getByCategory']);
+
 
 // Protected routes
 Route::middleware('auth:sanctum')->group(function () {
@@ -29,17 +38,18 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get("/instructors/{user}", [UserController::class, "show"]);
     Route::get("/logout", [UserController::class, "logout"]);
 
-    // Forum routes
+
+    // Forum route
     Route::post('/courses/{id}/forums', [CoursController::class, 'createForum']);
     Route::post('/forums/{forumId}/discussions', [CoursController::class, 'addDiscussion']);
     Route::get('/courses/{courseId}/forums/{forumId}/discussions/{discussionId}', [CoursController::class, 'showDiscussion']);
 
     // Cart routes
-    Route::get('/cart', 'App\Http\Controllers\PanierController@index');
-    Route::post('/cart/add', 'App\Http\Controllers\PanierController@addToCart');
-    Route::delete('/cart/{id}', 'App\Http\Controllers\PanierController@removeFromCart');
-    Route::delete('/cart', 'App\Http\Controllers\PanierController@clearCart');
-    Route::get('/cart/check/{id}', 'App\Http\Controllers\PanierController@checkInCart');
+    Route::get('/cart', [PanierController::class, 'index']);
+    Route::post('/cart/add', [PanierController::class, 'addToCart']);
+    Route::delete('/cart/{coursId}', [PanierController::class, 'removeFromCart']);
+    Route::delete('/cart', [PanierController::class, 'clearCart']);
+    Route::get('/cart/check/{coursId}', [PanierController::class, 'checkInCart']);
 
     Route::get('/discussions/{discussionId}/messages', [MessageController::class, 'index']);
 Route::post('/discussions/{discussionId}/messages', [MessageController::class, 'store']);
@@ -56,6 +66,7 @@ Route::middleware('auth:sanctum')->prefix('instructor')->group(function () {
 
     // Category routes
     Route::get('/categories', [InstructorCourseController::class, 'getCategories']);
+    Route::get('/categories/{id}', [InstructorCourseController::class, 'showCategorie']);
     Route::post('/categories', [InstructorCourseController::class, 'storeCategorie']);
     Route::put('/categories/{id}', [InstructorCourseController::class, 'updateCategorie']);
     Route::delete('/categories/{id}', [InstructorCourseController::class, 'destroyCategorie']);
@@ -93,7 +104,7 @@ Route::middleware('auth:sanctum')->prefix('instructor')->group(function () {
 Route::middleware(['auth:sanctum'])->prefix('admin')->group(function () {
     // Dashboard statistics
     Route::get("/dashboard", [AdminController::class, 'getStudents']);
-    Route::get('/admin/profile', [AdminController::class, 'showProfile']);
+    Route::get('/profile', [AdminController::class, 'showProfile']);
 
     // Route::get('/dashboard', [AdministrateurController::class, 'getDashboardStats']);
 

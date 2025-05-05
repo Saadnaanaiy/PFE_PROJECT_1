@@ -2,168 +2,115 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Cours;
 use App\Models\Panier;
+use App\Models\Cours;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class PanierController extends Controller
 {
     /**
-     * Get the current user's cart items
-     *
-     * @return \Illuminate\Http\Response
+     * Get the current active cart (panier) with its courses.
+     * If none exists, create one.
+     * Here: we map each course’s image filename to a full URL via asset().
      */
     public function index()
     {
         $user = Auth::user();
 
-        // Get or create the active cart
-        $panier = $user->panier ?? Panier::create([
-            'user_id' => $user->id,
-            'is_active' => true
-        ]);
+        $panier = Panier::firstOrCreate(
+            ['user_id' => $user->id, 'is_active' => true],
+            ['is_active' => true]
+        );
 
-        // Get cart with courses and their instructors
-        $panier->load([
-            'cours',
-            'cours.instructeur.user'
-        ]);
+        // eager-load
+        $panier->load('cours');
 
-        $cartItems = $panier->cours->map(function ($cours) {
-            return [
-                'id' => $cours->id,
-                'title' => $cours->titre,
-                'instructor' => $cours->instructeur->user->nom,
-                'price' => $cours->pivot->prix,
-                'originalPrice' => $cours->prix,
-                'quantity' => 1, // Quantity is always 1 for digital products
-                'image' => $cours->image,
-            ];
+        // transform each Cours model so the 'image' field holds a full URL
+        $coursAvecImages = $panier->cours->map(function ($cours) {
+            // assume images are in storage/app/public/cours/
+            $cours->image = asset('storage/' . $cours->image);
+            return $cours;
         });
 
-        return response()->json([
-            'success' => true,
-            'data' => $cartItems
-        ]);
+        // replace the relation on the Panier instance
+        $panier->setRelation('cours', $coursAvecImages);
+
+        return response()->json($panier);
     }
 
     /**
-     * Add a course to the cart
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\Response
+     * Add a course to the cart, with its current price.
      */
     public function addToCart(Request $request)
     {
         $request->validate([
-            'course_id' => 'required|exists:cours,id'
+            'cours_id' => 'required|exists:cours,id',
         ]);
 
-        $user = Auth::user();
-        $courseId = $request->input('course_id');
+        $user   = Auth::user();
+        $cours  = Cours::findOrFail($request->cours_id);
 
-        // Get or create active cart
-        $panier = $user->panier ?? Panier::create([
-            'user_id' => $user->id,
-            'is_active' => true
-        ]);
+        $panier = Panier::firstOrCreate(
+            ['user_id' => $user->id, 'is_active' => true],
+            ['is_active' => true]
+        );
 
-        // Check if course already in cart
-        if ($panier->cours()->where('cours_id', $courseId)->exists()) {
-            return response()->json([
-                'success' => true,
-                'message' => 'Course already in cart',
-                'inCart' => true
-            ]);
+        if ($panier->cours()->where('cours_id', $cours->id)->exists()) {
+            return response()->json(['message' => 'Course already in cart'], 409);
         }
 
-        // Get course current price
-        $cours = Cours::findOrFail($courseId);
-
-        // Add to cart with current price
-        $panier->cours()->attach($courseId, [
-            'prix' => $cours->prix
+        $panier->cours()->attach($cours->id, [
+            'prix' => $cours->prix,
         ]);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Course added to cart successfully',
-            'inCart' => true
-        ]);
+        return response()->json(['message' => 'Added to cart'], 201);
     }
 
     /**
-     * Remove course from cart
-     *
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
+     * Remove a single course from the cart
      */
-    public function removeFromCart($id)
+    public function removeFromCart($coursId)
     {
-        $user = Auth::user();
-        $panier = $user->panier;
+        $user   = Auth::user();
+        $panier = Panier::where('user_id', $user->id)
+                        ->where('is_active', true)
+                        ->firstOrFail();
 
-        if (!$panier) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Cart not found'
-            ], 404);
-        }
+        $panier->cours()->detach($coursId);
 
-        $panier->cours()->detach($id);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Course removed from cart'
-        ]);
+        return response()->json(['message' => 'Removed from cart']);
     }
 
     /**
-     * Clear all items from cart
-     *
-     * @return \Illuminate\Http\Response
+     * Clear all courses from the cart
      */
     public function clearCart()
     {
-        $user = Auth::user();
-        $panier = $user->panier;
-
-        if (!$panier) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Cart not found'
-            ], 404);
-        }
+        $user   = Auth::user();
+        $panier = Panier::where('user_id', $user->id)
+                        ->where('is_active', true)
+                        ->firstOrFail();
 
         $panier->cours()->detach();
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Cart cleared successfully'
-        ]);
+        return response()->json(['message' => 'Cart cleared']);
     }
 
     /**
-     * Check if a course is in the user's cart
-     *
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
+     * Check if a given course is in the cart
      */
-    public function checkInCart($id)
+    public function checkInCart($coursId)
     {
-        $user = Auth::user();
-        $panier = $user->panier;
+        $user   = Auth::user();
+        $panier = Panier::where('user_id', $user->id)
+                        ->where('is_active', true)
+                        ->first();
 
-        $inCart = false;
+        $inCart = $panier
+            ? (bool) $panier->cours()->where('cours_id', $coursId)->count()
+            : false;
 
-        if ($panier) {
-            $inCart = $panier->cours()->where('cours_id', $id)->exists();
-        }
-
-        return response()->json([
-            'success' => true,
-            'inCart' => $inCart
-        ]);
+        return response()->json(['in_cart' => $inCart]);
     }
 }
