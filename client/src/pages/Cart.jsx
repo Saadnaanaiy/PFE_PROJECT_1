@@ -10,73 +10,39 @@ const Cart = () => {
   const [cartItems, setCartItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // Fetch cart from API
   useEffect(() => {
-    const fetchCart = async () => {
-      try {
-        setLoading(true);
-        const response = await axios.get('/api/cart');
-        // Log the raw response to better understand its structure
-        console.log('Cart API response:', response.data);
-
-        // Safely map cart items with proper error handling for missing properties
-        setCartItems(
-          response.data.cours.map((item) => {
-            // Get instructor name safely, using a fallback if structure is incomplete
-            let instructorName = 'Unknown Instructor';
-            try {
-              if (
-                item.instructeur &&
-                item.instructeur.user &&
-                item.instructeur.user.nom
-              ) {
-                instructorName = item.instructeur.user.nom;
-              } else if (item.instructeur && item.instructeur.nom) {
-                instructorName = item.instructeur.nom;
-              }
-            } catch (err) {
-              console.warn(
-                `Could not extract instructor name for course ${item.id}`,
-                err,
-              );
-            }
-
-            return {
-              id: item.id,
-              title: item.titre || 'Unnamed Course',
-              instructor: instructorName,
-              price: item.prix || 0,
-              quantity: item.pivot?.quantity || 1,
-              image: item.image || '/placeholder-course.jpg',
-              originalPrice: null,
-            };
-          }),
-        );
-      } catch (err) {
-        console.error('Error fetching cart:', err);
-        setError('Failed to load cart items.');
-        toast.error('Failed to load cart items.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchCart();
   }, []);
 
-  const updateQuantity = async (itemId, newQuantity) => {
-    if (newQuantity < 1) return;
+  const fetchCart = async () => {
     try {
-      await axios.post('/api/cart/add', { cours_id: itemId });
-      setCartItems((prev) =>
-        prev.map((item) =>
-          item.id === itemId ? { ...item, quantity: newQuantity } : item,
-        ),
+      setLoading(true);
+      const response = await axios.get('/api/cart');
+      console.log('Cart API response:', response.data);
+
+      // Use the complete course objects from API to maintain all data including instructeur and categorie
+      setCartItems(
+        response.data.cours.map((item) => {
+          return {
+            ...item,
+            id: item.id,
+            title: item.titre || 'Unnamed Course',
+            price: item.prix || 0,
+            quantity: item.pivot?.quantity || 1,
+            image: item.image || '/placeholder-course.jpg',
+            originalPrice: null,
+          };
+        }),
       );
     } catch (err) {
-      console.error('Error updating quantity:', err);
-      toast.error('Unable to update quantity');
+      console.error('Error fetching cart:', err);
+      setError('Failed to load cart items.');
+      toast.error('Failed to load cart items.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -84,7 +50,7 @@ const Cart = () => {
     try {
       await axios.delete(`/api/cart/${itemId}`);
       setCartItems((prev) => prev.filter((item) => item.id !== itemId));
-      toast.info('Item removed');
+      toast.success('Item removed');
     } catch (err) {
       console.error('Error removing item:', err);
       toast.error('Unable to remove item');
@@ -95,10 +61,31 @@ const Cart = () => {
     try {
       await axios.delete('/api/cart');
       setCartItems([]);
-      toast.info('Cart cleared');
+      toast.success('Cart cleared');
     } catch (err) {
       console.error('Error clearing cart:', err);
       toast.error('Unable to clear cart');
+    }
+  };
+
+  const handleCheckout = async () => {
+    try {
+      setIsProcessing(true);
+
+      // Create a Stripe checkout session
+      const response = await axios.post('/api/checkout');
+      console.log(response.data);
+
+      // Redirect to Stripe's checkout page
+      if (response.data.url) {
+        window.location.href = response.data.url;
+      } else {
+        throw new Error('No checkout URL returned');
+      }
+    } catch (err) {
+      console.error('Checkout error:', err);
+      toast.error('Unable to proceed to checkout. Please try again.');
+      setIsProcessing(false);
     }
   };
 
@@ -159,7 +146,6 @@ const Cart = () => {
                     <CartItem
                       key={item.id}
                       item={item}
-                      updateQuantity={updateQuantity}
                       removeItem={removeItem}
                     />
                   ))}
@@ -210,14 +196,18 @@ const Cart = () => {
                     <span className="text-primary">{total.toFixed(2)} MAD</span>
                   </div>
                 </div>
+
                 <button
-                  onClick={() => navigate('/checkout')}
-                  className="btn-primary w-full py-3 rounded-md hover:bg-primary-dark transition-colors font-medium"
+                  onClick={handleCheckout}
+                  disabled={isProcessing}
+                  className={`btn-primary w-full py-3 rounded-md hover:bg-primary-dark transition-colors font-medium ${
+                    isProcessing ? 'opacity-70 cursor-not-allowed' : ''
+                  }`}
                 >
-                  Proceed to Checkout
+                  {isProcessing ? 'Processing...' : 'Proceed to Checkout'}
                 </button>
                 <div className="mt-6 text-center text-sm text-neutral-500 bg-neutral-50 rounded-md p-3">
-                  Secure checkout powered by trusted payment providers
+                  Secure checkout powered by Stripe
                 </div>
               </div>
             </div>

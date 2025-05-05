@@ -12,7 +12,7 @@ class PanierController extends Controller
     /**
      * Get the current active cart (panier) with its courses.
      * If none exists, create one.
-     * Here: we map each course’s image filename to a full URL via asset().
+     * Here: we map each course's image filename to a full URL via asset().
      */
     public function index()
     {
@@ -23,13 +23,24 @@ class PanierController extends Controller
             ['is_active' => true]
         );
 
-        // eager-load
-        $panier->load('cours');
+        // eager-load courses with instructors, their user details, and categories
+        $panier->load('cours.instructeur.user', 'cours.categorie');
 
         // transform each Cours model so the 'image' field holds a full URL
         $coursAvecImages = $panier->cours->map(function ($cours) {
-            // assume images are in storage/app/public/cours/
-            $cours->image = asset('storage/' . $cours->image);
+            // Set course image URL if it's not already a full URL
+            if (!str_starts_with($cours->image, 'http://') && !str_starts_with($cours->image, 'https://')) {
+                $cours->image = asset('storage/' . $cours->image);
+            }
+
+            // Set instructor image URL if it exists
+            if ($cours->instructeur && $cours->instructeur->image) {
+                // Check if the image URL already starts with http:// or https://
+                if (!str_starts_with($cours->instructeur->image, 'http://') && !str_starts_with($cours->instructeur->image, 'https://')) {
+                    $cours->instructeur->image = asset('storage/' . $cours->instructeur->image);
+                }
+            }
+
             return $cours;
         });
 

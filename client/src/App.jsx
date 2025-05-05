@@ -25,7 +25,8 @@ import CourseEdit from './pages/CourseEdit';
 import AdminDashboard from './pages/AdminDashboard';
 import { ToastContainer } from 'react-toastify';
 import CategorieDetaille from './pages/CategorieDetaille';
-
+import CheckoutResult from './pages/CheckoutResult';
+import PaymentRedirect from './pages/PaymentRedirect';
 
 // Define InstructorRoute component
 const InstructorRoute = ({ children }) => {
@@ -104,6 +105,11 @@ function App() {
             />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/checkout/result" element={<CheckoutResult />} />
+
+            {/* Payment redirect routes - these handle redirects from Stripe/backend */}
+            <Route path="/payment/success" element={<PaymentRedirect />} />
+            <Route path="/payment/cancel" element={<PaymentRedirect />} />
 
             {/* Protected routes */}
             <Route

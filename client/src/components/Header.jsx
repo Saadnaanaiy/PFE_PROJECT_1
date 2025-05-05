@@ -14,6 +14,9 @@ import { useAuth } from '../contexts/AuthContext';
 import { getCartItems } from '../services/cartService';
 import axios from 'axios';
 
+// Create a custom event for cart updates
+export const cartUpdatedEvent = new Event('cartUpdated');
+
 const Header = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
@@ -114,31 +117,48 @@ const Header = () => {
     }
   }, [user, loading]);
 
-  // Fetch cart items when auth state changes
-  useEffect(() => {
-    const fetchCartCount = async () => {
-      const isStudent =
-        localAuthState.isAuthenticated &&
-        localAuthState.userRole !== 'administrateur' &&
-        localAuthState.userRole !== 'instructeur';
+  // Fetch cart items when auth state changes or when cart is updated
+  const fetchCartCount = async () => {
+    const isStudent =
+      localAuthState.isAuthenticated &&
+      localAuthState.userRole !== 'administrateur' &&
+      localAuthState.userRole !== 'instructeur';
 
-      if (isStudent) {
-        try {
-          const items = await getCartItems();
-          setCartItemsCount(items.length);
-        } catch (error) {
-          console.error('Error fetching cart count:', error);
-          setCartItemsCount(0);
-        }
-      } else {
+    if (isStudent) {
+      try {
+        const items = await getCartItems();
+        setCartItemsCount(items.length);
+      } catch (error) {
+        console.error('Error fetching cart count:', error);
         setCartItemsCount(0);
       }
-    };
+    } else {
+      setCartItemsCount(0);
+    }
+  };
 
+  // Effect for initial cart count and context updates
+  useEffect(() => {
     if (!localAuthState.isLoading) {
       fetchCartCount();
     }
   }, [localAuthState, cartUpdateFlag]);
+
+  // Listen for custom cart updated events
+  useEffect(() => {
+    // Handler for the custom event
+    const handleCartUpdated = () => {
+      fetchCartCount();
+    };
+
+    // Add event listener
+    window.addEventListener('cartUpdated', handleCartUpdated);
+
+    // Clean up the event listener
+    return () => {
+      window.removeEventListener('cartUpdated', handleCartUpdated);
+    };
+  }, [localAuthState.isAuthenticated, localAuthState.userRole]);
 
   const handleLogout = async () => {
     await logout();

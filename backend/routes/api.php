@@ -7,13 +7,14 @@ use App\Http\Controllers\InstructorCourseController;
 use App\Http\Controllers\InstructorLessonController;
 use App\Http\Controllers\MessageController;
 use App\Http\Controllers\PanierController;
+use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\AdministrateurController;
 use Illuminate\Support\Facades\Route;
 
 // Public routes
 Route::post("/register", [UserController::class, "register"]);
-Route::post("/login", [UserController::class, "login"]);
+Route::post("/login", [UserController::class, "login"])->name("login");
 
 // Public course routes
 Route::get('/courses', [CoursController::class, 'index']);
@@ -22,11 +23,17 @@ Route::get('/categories', [CoursController::class, 'getCategories']);
 Route::get('/courses/{id}/forums', [CoursController::class, 'getForums']);
 // Public : toutes les catégories
 Route::get('/categories', [CategorieController::class, 'index']);
-// Public : détail d’une catégorie
+// Public : détail d'une catégorie
 Route::get('/categories/{id}', [CategorieController::class, 'show']);
-// Public : cours d’une catégorie
+// Public : cours d'une catégorie
 Route::get('/categories/{id}/courses', [CoursController::class, 'getByCategory']);
 
+// Enable the Stripe webhook endpoint
+Route::post('/stripe/webhook', [PaymentController::class, 'handleWebhook']);
+
+// Payment success and cancel routes need to be accessible without auth
+Route::get('/payment/success', [PaymentController::class, 'success'])->name('payment.success');
+Route::get('/payment/cancel', [PaymentController::class, 'cancel'])->name('payment.cancel');
 
 // Protected routes
 Route::middleware('auth:sanctum')->group(function () {
@@ -52,7 +59,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/cart/check/{coursId}', [PanierController::class, 'checkInCart']);
 
     Route::get('/discussions/{discussionId}/messages', [MessageController::class, 'index']);
-Route::post('/discussions/{discussionId}/messages', [MessageController::class, 'store']);
+    Route::post('/discussions/{discussionId}/messages', [MessageController::class, 'store']);
+
+    Route::post('/checkout', [PaymentController::class, 'createCheckoutSession']);
+
+    // Payment history
+    Route::get('/payment/history', [PaymentController::class, 'getPaymentHistory']);
 });
 
 // Instructor-specific routes
@@ -91,44 +103,15 @@ Route::middleware('auth:sanctum')->prefix('instructor')->group(function () {
     Route::post('/lessons/{lessonId}/video/complete', [InstructorCourseController::class, 'completeVideoUpload']);
 });
 
-// Lesson routes (commented out for now)
-// Route::middleware(['auth:sanctum'])->prefix('api/instructor/courses/{courseId}/sections/{sectionId}')->group(function () {
-//     Route::get('/lessons', [InstructorLessonController::class, 'getLessons']);
-//     Route::post('/lessons', [InstructorLessonController::class, 'storeLesson']);
-//     Route::put('/lessons/{lessonId}', [InstructorLessonController::class, 'updateLesson']);
-//     Route::delete('/lessons/{lessonId}', [InstructorLessonController::class, 'destroyLesson']);
-//     Route::post('/lessons/reorder', [InstructorLessonController::class, 'reorderLessons']);
-// });
-
 // Admin-specific routes
 Route::middleware(['auth:sanctum'])->prefix('admin')->group(function () {
     // Dashboard statistics
     Route::get("/dashboard", [AdminController::class, 'getStudents']);
     Route::get('/profile', [AdminController::class, 'showProfile']);
 
-    // Route::get('/dashboard', [AdministrateurController::class, 'getDashboardStats']);
-
-    // // User management
-    // Route::get('/users', [AdministrateurController::class, 'getAllUsers']);
-    // Route::get('/users/role/{role}', [AdministrateurController::class, 'getUsersByRole']);
-    // Route::get('/users/{id}', [AdministrateurController::class, 'getUser']);
-    // Route::post('/users', [AdministrateurController::class, 'createUser']);
-    // Route::put('/users/{id}', [AdministrateurController::class, 'updateUser']);
-    // Route::delete('/users/{id}', [AdministrateurController::class, 'deleteUser']);
-
-    // // Course management
-    // Route::get('/courses', [AdministrateurController::class, 'getAllCourses']);
-    // Route::get('/courses/{id}', [AdministrateurController::class, 'getCourse']);
     Route::put('/courses/{id}/update', [AdminController::class, 'updateCourse']);
     Route::delete('/courses/{id}', [AdminController::class, 'deleteCourse']);
 
     Route::put("/instructors/{id}/update", [AdminController::class, 'updateInstructor']);
     Route::delete("/instructors/{id}/delete", [AdminController::class, 'deleteInstructor']);
-
-    // // Category management
-    // Route::get('/categories', [AdministrateurController::class, 'getAllCategories']);
-    // Route::get('/categories/{id}', [AdministrateurController::class, 'getCategory']);
-    // Route::post('/categories', [AdministrateurController::class, 'createCategory']);
-    // Route::put('/categories/{id}', [AdministrateurController::class, 'updateCategory']);
-    // Route::delete('/categories/{id}', [AdministrateurController::class, 'deleteCategory']);
 });
