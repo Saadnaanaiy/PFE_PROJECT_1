@@ -24,34 +24,47 @@ const InstructorProfile = () => {
         const instructorResponse = await axios.get(
           `/api/instructors/${instructorId}`,
         );
+        console.log('Instructor data: ', instructorResponse.data);
 
-        console.log(instructorResponse.data);
+        // Check if we have the instructor data with courses
+        if (instructorResponse.data && instructorResponse.data.instructeur) {
+          // Format instructor data
+          const instructorData = {
+            id: instructorResponse.data.id,
+            name: instructorResponse.data.nom,
+            specialty: instructorResponse.data.instructeur.specialite,
+            image: instructorResponse.data.instructeur.image
+              ? `${instructorResponse.data.instructeur.image}`
+              : '/default-profile.jpg',
+            bio: instructorResponse.data.instructeur.bio,
+            fullBio: instructorResponse.data.instructeur.bio, // Use same bio for full bio if not provided
+            courses: instructorResponse.data.instructeur.courses_count || 0,
+            students: instructorResponse.data.instructeur.students_count || 0,
+          };
 
-        // Format instructor data
-        const instructorData = {
-          id: instructorResponse.data.id,
-          name: instructorResponse.data.nom,
-          specialty: instructorResponse.data.instructeur.specialite,
-          image: instructorResponse.data.instructeur.image
-            ? `${instructorResponse.data.instructeur.image}`
-            : '/default-profile.jpg',
-          bio: instructorResponse.data.instructeur.bio,
-          fullBio: instructorResponse.data.instructeur.bio, // Use same bio for full bio if not provided
-          courses: instructorResponse.data.instructeur.courses_count || 0,
-          students: instructorResponse.data.instructeur.students_count || 0,
-        };
+          setInstructor(instructorData);
 
-        setInstructor(instructorData);
-
-        // Fetch courses by this instructor (if you have an endpoint for this)
-        try {
-          const coursesResponse = await axios.get(
-            `/api/instructors/${instructorId}/courses`,
-          );
-          setInstructorCourses(coursesResponse.data.courses || []);
-        } catch (courseErr) {
-          console.error('Error fetching instructor courses:', courseErr);
-          setInstructorCourses([]); // Set empty courses on error
+          // Use the courses directly from the API response if available
+          if (
+            instructorResponse.data.instructeur.courses &&
+            Array.isArray(instructorResponse.data.instructeur.courses)
+          ) {
+            setInstructorCourses(instructorResponse.data.instructeur.courses);
+          } else {
+            // Fallback to fetching courses separately
+            try {
+              const coursesResponse = await axios.get('/api/courses');
+              const filteredCourses = coursesResponse.data.courses.filter(
+                (course) => course.instructor_id === parseInt(instructorId),
+              );
+              setInstructorCourses(filteredCourses || []);
+            } catch (courseErr) {
+              console.error('Error fetching instructor courses:', courseErr);
+              setInstructorCourses([]);
+            }
+          }
+        } else {
+          throw new Error('Invalid instructor data received');
         }
 
         // Fetch other instructors for recommendations
@@ -65,8 +78,8 @@ const InstructorProfile = () => {
               id: inst.id,
               name: inst.nom,
               specialty: inst.instructeur.specialite,
-              image: inst.image
-                ? `/storage/${inst.image}`
+              image: inst.instructeur.image
+                ? `${inst.instructeur.image}`
                 : '/default-profile.jpg',
             }))
             .slice(0, 4); // Get only up to 4 instructors
@@ -177,7 +190,9 @@ const InstructorProfile = () => {
                 <div className="flex flex-col items-center p-3 bg-primary/5 rounded-lg">
                   <FiUsers className="text-primary mb-1" />
                   <span className="font-semibold">
-                    {instructor.students.toLocaleString()}
+                    {typeof instructor.students === 'number'
+                      ? instructor.students.toLocaleString()
+                      : '0'}
                   </span>
                   <span className="text-sm text-neutral-600">Students</span>
                 </div>
@@ -258,10 +273,7 @@ const InstructorProfile = () => {
                               </span>
                             )}
                           </span>
-                          <span className="text-sm text-neutral-600">
-                            {course.students_count?.toLocaleString() || 0}{' '}
-                            Students
-                          </span>
+                          
                         </div>
                       </div>
                     </div>

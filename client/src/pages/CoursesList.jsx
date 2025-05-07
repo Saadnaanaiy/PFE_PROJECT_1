@@ -50,6 +50,7 @@ const CoursesList = () => {
           axios.get('/api/courses'),
           axios.get('/api/categories'),
         ]);
+        console.log(coursesRes.data);
         const coursesData = coursesRes.data.data.data.map((course) => {
           return {
             ...course,

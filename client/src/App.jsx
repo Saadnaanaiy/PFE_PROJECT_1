@@ -90,7 +90,7 @@ function App() {
           <Routes>
             {/* Public routes */}
             <Route path="/" element={<Home />} />
-            <Route path="/course/:courseId" element={<CourseDetails />} />
+            <Route path="/courses/:courseId" element={<CourseDetails />} />
             <Route path="/courses" element={<CoursesList />} />
             <Route path="/categories" element={<CategoriesList />} />
             <Route path="/categories/:id" element={<CategorieDetaille />} />

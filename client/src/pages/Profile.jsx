@@ -28,7 +28,8 @@ const Profile = () => {
     totalCreated: 0,
     categoriesCreated: 0,
   });
-  // Add state to track images that failed to load
+
+  // Initialize failedImages state with empty objects
   const [failedImages, setFailedImages] = useState({
     profile: false,
     courses: {},
@@ -78,14 +79,20 @@ const Profile = () => {
         setLoading(true);
         try {
           // First check if the API path is correct - it should match your backend route
-          const response = await axios.get(`/api/student/courses`);
+          const response = await axios.get(`/api/enrolled-courses`);
           console.log('Student courses API response:', response.data);
 
-          if (response.data && response.data.courses) {
-            setEnrolledCourses(response.data.courses);
+          // Fix: Access the correct path to enrolled_courses
+          if (
+            response.data &&
+            response.data.data &&
+            response.data.data.enrolled_courses
+          ) {
+            setEnrolledCourses(response.data.data.enrolled_courses);
 
             // Calculate enrolled courses statistics
-            const courses = response.data.courses;
+            const courses = response.data.data.enrolled_courses;
+            console.log('courses: ', courses);
             const uniqueCategories = new Set(
               courses.map((c) => c.categorie_id).filter(Boolean),
             ).size;
@@ -172,8 +179,9 @@ const Profile = () => {
     if (user) fetchInstructorData();
   }, [user, isInstructor]);
 
-  // Handler for image loading errors
+  // Fixed image error handler function
   const handleImageError = (id, type = 'courses') => {
+    console.error(`Image loading failed for ${type} id: ${id}`);
     if (type === 'profile') {
       setFailedImages((prev) => ({
         ...prev,
@@ -376,7 +384,8 @@ const Profile = () => {
                         className="bg-white border border-neutral-100 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow"
                       >
                         <div className="relative h-40 overflow-hidden">
-                          {failedImages.courses[course.id] || !course.image ? (
+                          {/* FIXED: Only show fallback if image failed to load OR no image exists */}
+                          {!course.image ? (
                             <div className="w-full h-full flex items-center justify-center bg-neutral-200">
                               <FiBook className="text-neutral-400 text-4xl" />
                             </div>
@@ -386,7 +395,15 @@ const Profile = () => {
                               alt={course.titre}
                               className="w-full h-full object-cover transition-transform hover:scale-105"
                               onError={() => handleImageError(course.id)}
+                              // Show fallback if this specific image has failed
+                              style={{ display: failedImages.courses[course.id] ? 'none' : 'block' }}
                             />
+                          )}
+                          {/* Show fallback if this specific image has failed */}
+                          {failedImages.courses[course.id] && course.image && (
+                            <div className="w-full h-full flex items-center justify-center bg-neutral-200">
+                              <FiBook className="text-neutral-400 text-4xl" />
+                            </div>
                           )}
                           <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-3">
                             <span className="text-xs font-medium px-2 py-1 bg-white/90 rounded-full text-primary">
@@ -409,7 +426,7 @@ const Profile = () => {
                               className="mr-1 text-neutral-400"
                               size={14}
                             />
-                            {course.instructeur?.nom || 'Unknown Instructor'}
+                            {course.instructeur || 'Unknown Instructor'}
                           </p>
 
                           <div className="mb-2">
@@ -561,8 +578,8 @@ const Profile = () => {
                           className="border border-neutral-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow"
                         >
                           <div className="h-32 relative bg-neutral-200">
-                            {failedImages.courses[course.id] ||
-                            !course.image ? (
+                            {/* FIXED: Only show fallback if image failed to load OR no image exists */}
+                            {!course.image ? (
                               <div className="flex items-center justify-center h-full bg-neutral-800">
                                 <FiLayers className="text-white/90 text-4xl" />
                               </div>
@@ -572,7 +589,14 @@ const Profile = () => {
                                 alt={course.titre}
                                 className="w-full h-full object-cover"
                                 onError={() => handleImageError(course.id)}
+                                style={{ display: failedImages.courses[course.id] ? 'none' : 'block' }}
                               />
+                            )}
+                            {/* Show fallback if this specific image has failed */}
+                            {failedImages.courses[course.id] && course.image && (
+                              <div className="flex items-center justify-center h-full bg-neutral-800">
+                                <FiLayers className="text-white/90 text-4xl" />
+                              </div>
                             )}
                             <div className="absolute bottom-2 right-2">
                               <span className="text-xs font-medium px-2 py-1 bg-white/90 rounded-full text-primary">
@@ -588,9 +612,7 @@ const Profile = () => {
                               {course.titre}
                             </Link>
                             <div className="flex justify-between text-sm text-neutral-600">
-                              <span>
-                                {course.sections?.length || 0} Sections
-                              </span>
+                              
                               <Link
                                 to={`/instructor/courses/${course.id}/edit`}
                                 className="text-primary hover:underline"
@@ -630,9 +652,7 @@ const Profile = () => {
                 {isAdmin ? (
                   // Admins get an FiShield icon instead of an image
                   <FiShield className="text-primary w-10 h-10" />
-                ) : isInstructor &&
-                  instructorData?.image &&
-                  !failedImages.profile ? (
+                ) : isInstructor && instructorData?.image && !failedImages.profile ? (
                   // Instructor image from instructorData
                   <img
                     src={instructorData.image}
@@ -692,6 +712,7 @@ const Profile = () => {
                   </>
                 ) : null}
               </div>
+
 
               <button
                 onClick={logout}

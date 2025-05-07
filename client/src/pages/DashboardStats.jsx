@@ -9,18 +9,25 @@ export default function DashboardStats({ dashboardData }) {
   const [coursesByPrice, setCoursesByPrice] = useState([]);
   const [coursesByDuration, setCoursesByDuration] = useState([]);
   const [userCounts, setUserCounts] = useState({ students: 0, instructors: 0 });
+  const [transactionStats, setTransactionStats] = useState({
+    totalAmount: 0,
+    byStatus: [],
+    byMonth: [],
+  });
 
   // Refs for chart canvases
   const coursesChartRef = useRef(null);
   const priceChartRef = useRef(null);
   const durationChartRef = useRef(null);
   const growthChartRef = useRef(null);
+  const transactionChartRef = useRef(null);
 
   // Refs to store chart instances
   const coursesChartInstance = useRef(null);
   const priceChartInstance = useRef(null);
   const durationChartInstance = useRef(null);
   const growthChartInstance = useRef(null);
+  const transactionChartInstance = useRef(null);
 
   // Colors for charts
   const COLORS = [
@@ -50,11 +57,11 @@ export default function DashboardStats({ dashboardData }) {
     // Process courses by price
     if (dashboardData?.courses?.length) {
       const priceRanges = [
-        { name: '0-50 MAD', min: 0, max: 50 },
-        { name: '51-100 MAD', min: 50.01, max: 100 },
-        { name: '101-150 MAD', min: 100.01, max: 150 },
-        { name: '151-200 MAD', min: 150.01, max: 200 },
-        { name: '201+ MAD', min: 200.01, max: Infinity },
+        { name: '0-50 MAD', min: 0, max: 50, count: 0 },
+        { name: '51-100 MAD', min: 50.01, max: 100, count: 0 },
+        { name: '101-150 MAD', min: 100.01, max: 150, count: 0 },
+        { name: '151-200 MAD', min: 150.01, max: 200, count: 0 },
+        { name: '201+ MAD', min: 200.01, max: Infinity, count: 0 },
       ];
 
       dashboardData.courses.forEach((course) => {
@@ -88,6 +95,59 @@ export default function DashboardStats({ dashboardData }) {
     const totalStudents = dashboardData?.etudiants?.length || 0;
     const totalInstructors = dashboardData?.instructeurs?.length || 0;
     setUserCounts({ students: totalStudents, instructors: totalInstructors });
+  }, [dashboardData]);
+
+  useEffect(() => {
+    // Process transaction statistics
+    if (dashboardData?.transactions?.length) {
+      // Calculate total amount
+      const totalAmount = dashboardData.transactions.reduce(
+        (sum, t) => sum + Number(t.total_amount || 0),
+        0,
+      );
+
+      // Group by status
+      const statusCounts = {};
+      dashboardData.transactions.forEach((t) => {
+        const status = t.status || 'pending';
+        statusCounts[status] = (statusCounts[status] || 0) + 1;
+      });
+      const byStatus = Object.entries(statusCounts).map(([status, count]) => ({
+        status,
+        count,
+      }));
+
+      // Group by month for the current year
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      const monthCounts = {};
+      // Initialize all months with 0
+      for (let m = 0; m < 12; m++) {
+        const key = `${currentYear}-${String(m + 1).padStart(2, '0')}`;
+        monthCounts[key] = 0;
+      }
+      dashboardData.transactions.forEach((t) => {
+        const date = new Date(t.created_at);
+        if (date.getFullYear() === currentYear) {
+          const monthYear = `${date.getFullYear()}-${String(
+            date.getMonth() + 1,
+          ).padStart(2, '0')}`;
+          monthCounts[monthYear] = (monthCounts[monthYear] || 0) + 1;
+        }
+      });
+      const byMonth = Object.entries(monthCounts)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([month, count]) => ({
+          month,
+          count,
+        }));
+
+      setTransactionStats({
+        totalAmount,
+        byStatus,
+        byMonth,
+      });
+    }
   }, [dashboardData]);
 
   useEffect(() => {
@@ -173,8 +233,10 @@ export default function DashboardStats({ dashboardData }) {
             {
               label: 'Number of Courses',
               data: coursesByPrice.map((i) => i.count),
-              backgroundColor: coursesByPrice.map(
-                (_, i) => COLORS[i % COLORS.length],
+              backgroundColor: coursesByPrice.map((_, i) =>
+                i % 2 === 0
+                  ? 'rgba(14, 165, 233, 0.8)'
+                  : 'rgba(139, 92, 246, 0.8)',
               ),
               borderColor: 'white',
               borderWidth: 1,
@@ -239,6 +301,55 @@ export default function DashboardStats({ dashboardData }) {
       });
     }
 
+    // Transaction chart
+    if (transactionChartRef.current && transactionStats.byMonth.length) {
+      if (transactionChartInstance.current)
+        transactionChartInstance.current.destroy();
+      const ctx = transactionChartRef.current.getContext('2d');
+      transactionChartInstance.current = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: transactionStats.byMonth.map((i) => {
+            const [year, month] = i.month.split('-');
+            return new Date(year, month - 1).toLocaleDateString('en-US', {
+              month: 'short',
+            });
+          }),
+          datasets: [
+            {
+              label: 'Transactions',
+              data: transactionStats.byMonth.map((i) => i.count),
+              borderColor: 'rgba(99, 102, 241, 0.8)',
+              backgroundColor: 'rgba(99, 102, 241, 0.1)',
+              tension: 0.4,
+              fill: true,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => `${ctx.raw} transactions`,
+              },
+            },
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: { precision: 0 },
+            },
+            x: {
+              grid: { display: false },
+            },
+          },
+        },
+      });
+    }
+
     // Cleanup on unmount
     return () => {
       [
@@ -246,11 +357,18 @@ export default function DashboardStats({ dashboardData }) {
         coursesChartInstance,
         priceChartInstance,
         durationChartInstance,
+        transactionChartInstance,
       ].forEach((ref) => {
         if (ref.current) ref.current.destroy();
       });
     };
-  }, [userCounts, coursesByLevel, coursesByPrice, coursesByDuration]);
+  }, [
+    userCounts,
+    coursesByLevel,
+    coursesByPrice,
+    coursesByDuration,
+    transactionStats,
+  ]);
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-12 gap-6 mb-8">
@@ -291,6 +409,42 @@ export default function DashboardStats({ dashboardData }) {
         </h3>
         <div className="h-72 flex justify-center">
           <canvas ref={durationChartRef} />
+        </div>
+      </div>
+
+      {/* Transaction Statistics */}
+      <div className="bg-white p-6 rounded-xl shadow-md md:col-span-12">
+        <h3 className="text-lg font-medium text-neutral-800 mb-4">
+          Transaction Statistics
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+          <div className="bg-indigo-50 p-4 rounded-lg">
+            <h4 className="text-sm font-medium text-indigo-600 mb-1">
+              Total Revenue
+            </h4>
+            <p className="text-2xl font-bold text-indigo-700">
+              {transactionStats.totalAmount.toLocaleString()} MAD
+            </p>
+          </div>
+          <div className="bg-green-50 p-4 rounded-lg">
+            <h4 className="text-sm font-medium text-green-600 mb-1">
+              Total Transactions
+            </h4>
+            <p className="text-2xl font-bold text-green-700">
+              {dashboardData.transactions?.length || 0}
+            </p>
+          </div>
+          <div className="bg-orange-50 p-4 rounded-lg">
+            <h4 className="text-sm font-medium text-orange-600 mb-1">
+              Active Carts
+            </h4>
+            <p className="text-2xl font-bold text-orange-700">
+              {dashboardData.paniers?.filter((p) => p.is_active)?.length || 0}
+            </p>
+          </div>
+        </div>
+        <div className="h-72">
+          <canvas ref={transactionChartRef} />
         </div>
       </div>
     </div>

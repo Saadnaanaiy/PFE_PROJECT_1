@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 /**
  * PaymentRedirect component
@@ -8,20 +9,27 @@ import { useState, useEffect } from 'react';
  */
 const PaymentRedirect = () => {
   const [isLoading, setIsLoading] = useState(true);
+  const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     // Get URL search parameters
-    const searchParams = new URLSearchParams(window.location.search);
+    const searchParams = new URLSearchParams(location.search);
     const sessionId = searchParams.get('session_id');
     const error = searchParams.get('error');
 
     // Determine status based on URL and parameters
     let redirectParams = new URLSearchParams();
 
-    if (window.location.pathname.includes('/payment/success') && sessionId) {
+    if (location.pathname.includes('/payment/success') && sessionId) {
       redirectParams.set('status', 'success');
-      redirectParams.set('transaction_id', '1'); // In a real app, this would come from your backend
-    } else if (window.location.pathname.includes('/payment/cancel')) {
+      // The transaction_id should come from your backend via the URL
+      // This is just a fallback in case it's not provided
+      redirectParams.set(
+        'transaction_id',
+        searchParams.get('transaction_id') || '1',
+      );
+    } else if (location.pathname.includes('/payment/cancel')) {
       redirectParams.set('status', 'cancelled');
     } else {
       redirectParams.set('status', 'error');
@@ -30,9 +38,9 @@ const PaymentRedirect = () => {
       }
     }
 
-    // Redirect to checkout result page
-    window.location.href = `/checkout/result?${redirectParams.toString()}`;
-  }, []);
+    // Redirect to checkout result page using React Router navigation
+    navigate(`/checkout/result?${redirectParams.toString()}`);
+  }, [navigate, location]);
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-neutral-50">

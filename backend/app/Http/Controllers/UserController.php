@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Cours;
 use App\Models\Etudiant;
 use App\Models\Instructeur;
 use Illuminate\Http\Request;
@@ -203,57 +204,106 @@ class UserController extends Controller
     /**
  * Obtenir une liste des utilisateurs avec le rôle 'instructeur'.
  */
-public function getInstructors()
-{
+
+ public function getInstructorCourses($user) {
+    // Verify the user exists and is an instructor
+    $instructor = User::where('id', $user)
+        ->whereHas('instructeur')
+        ->first();
+
+    if (!$instructor) {
+        return response()->json(['message' => 'Instructor not found'], 404);
+    }
+
+    // Get all courses by this instructor
+    $courses = Cours::where('instructor_id', $user)
+        ->with(['categorie', 'reviews', 'sections'])
+        ->withCount(['students as students_count', 'sections as sections_count'])
+        ->get();
+
+    return response()->json([
+        'courses' => $courses
+    ], 200);
+}
+public function getInstructors() {
     // Get instructors with related data
-   $instructors = User::where('role', 'instructeur')
-    ->with(['instructeur' => function($query) {
-        $query->select('id', 'user_id', 'bio', 'specialite', 'image');
-        // Add this to include courses created by the instructor
-        $query->with(['cours' => function($coursQuery) {
-            $coursQuery->select('id', 'titre', 'description', 'prix', 'niveau',
-                               'image', 'instructeur_id', 'categorie_id');
-        }]);
-        // Count courses created by the instructor
-        $query->withCount('cours');
-    }])
-    ->get();
+    $instructeurs = User::where('role', 'instructeur')
+        ->with(['instructeur' => function($query) {
+            $query->select('id', 'user_id', 'bio', 'specialite', 'image');
+            // Include courses created by the instructor
+            $query->with(['cours' => function($coursQuery) {
+                $coursQuery->select('id', 'titre', 'description', 'prix', 'niveau',
+                                   'image', 'instructeur_id', 'categorie_id');
+                // Count students enrolled in each course
+                $coursQuery->withCount('etudiants');
+            }]);
+            // Count courses created by the instructor
+            $query->withCount('cours');
+        }])
+        ->get();
 
-    // Transform the instructors collection
-    $instructors->transform(function ($instructor) {
-        // Add course and student counts if not available through relationships
-        
+    // Get total enrollment counts for each instructor
+    foreach ($instructeurs as $instructeur) {
+        if ($instructeur->instructeur) {
+            // Get instructor ID
+            $instructeurId = $instructeur->instructeur->id;
 
-        if (!isset($instructor->instructeur->students_count)) {
-            $instructor->instructeur->students_count = rand(500, 5000); // Temporary replacement for demo
+            // Count total enrollment records for this instructor's courses
+            $totalEnrollments = DB::table('etudiant_cours')
+                ->join('cours', 'etudiant_cours.cours_id', '=', 'cours.id')
+                ->where('cours.instructeur_id', $instructeurId)
+                ->count();
+
+            // Set the students_count property to the total enrollments
+            // This counts each student-course combination (not deduplicating students)
+            $instructeur->instructeur->students_count = $totalEnrollments;
+
+            // For debugging/comparison: Also get the unique student count
+            $uniqueStudentsCount = DB::table('etudiant_cours')
+                ->join('cours', 'etudiant_cours.cours_id', '=', 'cours.id')
+                ->where('cours.instructeur_id', $instructeurId)
+                ->select('etudiant_cours.etudiant_id')
+                ->distinct()
+                ->count();
+
+            $instructeur->instructeur->unique_students_count = $uniqueStudentsCount;
+        } else {
+            $instructeur->instructeur->students_count = 0;
+            $instructeur->instructeur->unique_students_count = 0;
         }
+    }
 
+    // Transform the instructeurs collection
+    $instructeurs->transform(function ($instructeur) {
         // Transform the image URL if exists
-        if (isset($instructor->instructeur->image)) {
-            $instructor->instructeur->image = asset('storage/' . $instructor->instructeur->image);
+        if (isset($instructeur->instructeur->image)) {
+            $instructeur->instructeur->image = asset('storage/' . $instructeur->instructeur->image);
         } else {
             // Provide a default image URL
-            $instructor->instructeur->image = asset('img/default-instructor.jpg');
+            $instructeur->instructeur->image = asset('img/default-instructor.jpg');
         }
 
-        return $instructor;
+        return $instructeur;
     });
 
-    return response()->json(['instructors' => $instructors]);
+    return response()->json(['instructors' => $instructeurs]);
 }
 
     /**
      * Obtenir les détails d'un utilisateur spécifique.
      * Potentiellement restreindre l'accès en fonction des rôles.
      */
-    public function show($id)
+public function show($id)
 {
     $user = User::where('id', $id)
-        ->with(['instructeur' => function($query) {
-            $query->select('id', 'user_id', 'bio', 'specialite', 'image');
-        }, 'etudiant' => function($query) {
-            $query->select('id', 'user_id', 'image');
-        }])
+        ->with([
+            'instructeur' => function ($query) {
+                $query->select('id', 'user_id', 'bio', 'specialite', 'image');
+            },
+            'etudiant' => function ($query) {
+                $query->select('id', 'user_id', 'image');
+            }
+        ])
         ->first();
 
     if (!$user) {
@@ -261,17 +311,31 @@ public function getInstructors()
     }
 
     if ($user->role === 'instructeur') {
-        // Add course and student counts if not available through relationships
-        if (!isset($user->instructeur->courses_count)) {
-            // If you have a courses table with instructor_id field, you could count:
-            // $user->instructeur->courses_count = Course::where('instructor_id', $user->instructeur->id)->count();
-            $user->instructeur->courses_count = rand(1, 15); // Temporary replacement for demo
-        }
+        // Load courses for this instructor
+        $courses = Cours::where('instructeur_id', $user->instructeur->id)
+            ->select('id', 'titre', 'description', 'image', 'prix', 'created_at')
+            ->get();
 
-        if (!isset($user->instructeur->students_count)) {
-            // You could calculate this from enrollments if you have the tables
-            $user->instructeur->students_count = rand(500, 5000); // Temporary replacement for demo
-        }
+        // Transform courses for frontend compatibility
+        $transformedCourses = $courses->map(function($cours) {
+            return [
+                'id' => $cours->id,
+                'title' => $cours->titre,  // Map French to English names for frontend
+                'description' => $cours->description,
+                'price' => $cours->prix,
+                'image' => $cours->image ? asset('storage/' . $cours->image) : asset('img/default-course.jpg'),
+                'created_at' => $cours->created_at
+            ];
+        });
+
+        // Add courses to the response
+        $user->instructeur->courses = $transformedCourses;  // Use "courses" instead of "cours" for frontend
+
+        // Count courses and students
+        $user->instructeur->courses_count = $courses->count();  // Use "courses_count" instead of "cours_count"
+        $user->instructeur->students_count = Etudiant::whereHas('cours', function ($query) use ($courses) {
+            $query->whereIn('cours.id', $courses->pluck('id'));
+        })->count();
 
         // Transform the image URL if exists
         if ($user->instructeur && $user->instructeur->image) {

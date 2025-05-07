@@ -13,6 +13,57 @@ use Illuminate\Support\Facades\Validator;
 class CoursController extends Controller
 {
     /**
+     * Helper method to ensure proper asset URL formatting
+     *
+     * @param string|null $path
+     * @return string|null
+     */
+    private function formatAssetUrl($path)
+    {
+        if (!$path) {
+            return null;
+        }
+
+        // If path already contains the full URL, return it as is
+        if (strpos($path, 'http://') === 0 || strpos($path, 'https://') === 0) {
+            return $path;
+        }
+
+        // Otherwise, build the proper asset URL
+        return asset('storage/' . $path);
+    }
+
+    /**
+     * Transform a course object to include proper image URLs
+     *
+     * @param \App\Models\Cours $course
+     * @return \App\Models\Cours
+     */
+    private function transformCourseImages($course)
+    {
+        // Transform course image
+        if ($course->image) {
+            $course->image = $this->formatAssetUrl($course->image);
+        }
+
+        // Transform instructor image
+        if ($course->instructeur) {
+            if ($course->instructeur->image) {
+                $course->instructeur->image = $this->formatAssetUrl($course->instructeur->image);
+            }
+            if ($course->instructeur->user) {
+                if ($course->instructeur->user->image) {
+                    $course->instructeur->user->image = $this->formatAssetUrl($course->instructeur->user->image);
+                }
+                // Add full name for instructor
+                $course->instructeur->user->full_name = $course->instructeur->user->nom;
+            }
+        }
+
+        return $course;
+    }
+
+    /**
      * Display a listing of the courses.
      *
      * @return \Illuminate\Http\Response
@@ -93,26 +144,7 @@ class CoursController extends Controller
 
         // Transform the courses to include full image URLs
         $courses->getCollection()->transform(function ($course) {
-            // Transform course image
-            if ($course->image) {
-                $course->image = asset('storage/' . $course->image);
-            }
-
-            // Transform instructor image
-            if ($course->instructeur) {
-                if ($course->instructeur->image) {
-                    $course->instructeur->image = asset('storage/' . $course->instructeur->image);
-                }
-                if ($course->instructeur->user) {
-                    if ($course->instructeur->user->image) {
-                        $course->instructeur->user->image = asset('storage/' . $course->instructeur->user->image);
-                    }
-                    // Add full name for instructor
-                    $course->instructeur->user->full_name = $course->instructeur->user->nom;
-                }
-            }
-
-            return $course;
+            return $this->transformCourseImages($course);
         });
 
         return response()->json([
@@ -173,22 +205,8 @@ class CoursController extends Controller
             $query->select('id', 'nom', 'email', 'image');
         }]);
 
-        // Transform images to full URLs
-        if ($course->image) {
-            $course->image = asset('storage/' . $course->image);
-        }
-        if ($course->instructeur) {
-            if ($course->instructeur->image) {
-                $course->instructeur->image = asset('storage/' . $course->instructeur->image);
-            }
-            if ($course->instructeur->user) {
-                if ($course->instructeur->user->image) {
-                    $course->instructeur->user->image = asset('storage/' . $course->instructeur->user->image);
-                }
-                // Add full name for instructor
-                $course->instructeur->user->full_name = $course->instructeur->user->nom;
-            }
-        }
+        // Transform the course to include full image URLs
+        $course = $this->transformCourseImages($course);
 
         return response()->json([
             'status' => 'success',
@@ -215,20 +233,7 @@ class CoursController extends Controller
         ])->withCount('etudiants')->findOrFail($id);
 
         // Transform images to full URLs
-        if ($course->image) {
-            $course->image = asset('storage/' . $course->image);
-        }
-        if ($course->instructeur) {
-            if ($course->instructeur->image) {
-                $course->instructeur->image = asset('storage/' . $course->instructeur->image);
-            }
-            if ($course->instructeur->user) {
-                if ($course->instructeur->user->image) {
-                    $course->instructeur->user->image = asset('storage/' . $course->instructeur->user->image);
-                }
-                $course->instructeur->user->full_name = $course->instructeur->user->nom;
-            }
-        }
+        $course = $this->transformCourseImages($course);
 
         // Transform section/lesson/video structure
         if ($course->sections) {
@@ -236,7 +241,7 @@ class CoursController extends Controller
                 if ($section->lecons) {
                     foreach ($section->lecons as $lecon) {
                         if ($lecon->video && $lecon->video->url) {
-                            $lecon->video->url = asset('storage/' . $lecon->video->url);
+                            $lecon->video->url = $this->formatAssetUrl($lecon->video->url);
                         }
                     }
                 }
@@ -249,7 +254,7 @@ class CoursController extends Controller
                 if ($forum->discussions) {
                     foreach ($forum->discussions as $discussion) {
                         if ($discussion->user && $discussion->user->image) {
-                            $discussion->user->image = asset('storage/' . $discussion->user->image);
+                            $discussion->user->image = $this->formatAssetUrl($discussion->user->image);
                         }
                     }
                 }
@@ -327,22 +332,8 @@ class CoursController extends Controller
             $query->select('id', 'nom', 'email', 'image');
         }]);
 
-        // Transform images to full URLs
-        if ($course->image) {
-            $course->image = asset('storage/' . $course->image);
-        }
-        if ($course->instructeur) {
-            if ($course->instructeur->image) {
-                $course->instructeur->image = asset('storage/' . $course->instructeur->image);
-            }
-            if ($course->instructeur->user) {
-                if ($course->instructeur->user->image) {
-                    $course->instructeur->user->image = asset('storage/' . $course->instructeur->user->image);
-                }
-                // Add full name for instructor
-                $course->instructeur->user->full_name = $course->instructeur->user->nom;
-            }
-        }
+        // Transform the course to include full image URLs
+        $course = $this->transformCourseImages($course);
 
         return response()->json([
             'status' => 'success',
@@ -508,17 +499,37 @@ class CoursController extends Controller
         ], 201);
     }
 
-public function showDiscussion($courseId, $forumId, $discussionId)
-{
-    $discussion = Discussion::with(['user', 'messages.user'])
-        ->where('id', $discussionId)
-        ->where('forum_id', $forumId)
-        ->firstOrFail();
+    /**
+     * Display the specified discussion
+     *
+     * @param int $courseId Course ID
+     * @param int $forumId Forum ID
+     * @param int $discussionId Discussion ID
+     * @return \Illuminate\Http\Response
+     */
+    public function showDiscussion($courseId, $forumId, $discussionId)
+    {
+        $discussion = Discussion::with(['user', 'messages.user'])
+            ->where('id', $discussionId)
+            ->where('forum_id', $forumId)
+            ->firstOrFail();
 
-    return response()->json([
-        'success' => true,
-        'data' => $discussion
-    ]);
-}
+        // Format user images
+        if ($discussion->user && $discussion->user->image) {
+            $discussion->user->image = $this->formatAssetUrl($discussion->user->image);
+        }
 
+        if ($discussion->messages) {
+            foreach ($discussion->messages as $message) {
+                if ($message->user && $message->user->image) {
+                    $message->user->image = $this->formatAssetUrl($message->user->image);
+                }
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => $discussion
+        ]);
+    }
 }

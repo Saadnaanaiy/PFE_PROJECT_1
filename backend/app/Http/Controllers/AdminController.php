@@ -12,6 +12,8 @@ use App\Models\Message;
 use App\Models\Section;
 use App\Models\Lecon;
 use App\Models\Video;
+use App\Models\Transaction;
+use App\Models\Panier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -62,6 +64,10 @@ class AdminController extends Controller
         $discussions = Discussion::all();
         $messages = Message::all();
 
+        // Get transactions and paniers
+        $transactions = Transaction::with(['user', 'panier'])->get();
+        $paniers = Panier::with(['user', 'cours'])->get();
+
         return response()->json([
             $students,
             $instructors,
@@ -72,7 +78,9 @@ class AdminController extends Controller
             $videos,
             $forums,
             $discussions,
-            $messages
+            $messages,
+            $transactions,
+            $paniers
         ], 200);
     }
 

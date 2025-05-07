@@ -79,79 +79,81 @@ class PaymentController extends Controller
      * Handle successful payment
      */
     public function success(Request $request)
-    {
-        $sessionId = $request->get('session_id');
+{
+    $sessionId = $request->get('session_id');
 
-        if (!$sessionId) {
-            // Redirect to a success page with error message
-            return redirect()->to('/checkout/result?status=error&message=Session+ID+is+missing');
+    if (!$sessionId) {
+        // Frontend URL for error - ensure this matches your React route
+        return redirect()->to('/checkout/result?status=error&message=Session+ID+is+missing');
+    }
+
+    Stripe::setApiKey(config('services.stripe.secret'));
+
+    try {
+        // Retrieve the session
+        $session = Session::retrieve($sessionId);
+        $userId = $session->metadata->user_id;
+        $panierId = $session->metadata->panier_id;
+
+        $user = User::find($userId);
+        $panier = Panier::find($panierId);
+
+        if (!$user || !$panier) {
+            return redirect()->to('/checkout/result?status=error&message=Invalid+user+or+cart');
         }
 
-        Stripe::setApiKey(config('services.stripe.secret'));
+        // Calculate total amount
+        $totalAmount = 0;
+        foreach ($panier->cours as $cours) {
+            $totalAmount += $cours->pivot->prix;
+        }
+
+        // Begin transaction
+        DB::beginTransaction();
 
         try {
-            // Retrieve the session
-            $session = Session::retrieve($sessionId);
-            $userId = $session->metadata->user_id;
-            $panierId = $session->metadata->panier_id;
+            // Create transaction record
+            $transaction = Transaction::create([
+                'user_id' => $userId,
+                'panier_id' => $panierId,
+                'total_amount' => $totalAmount,
+                'payment_id' => $sessionId,
+                'payment_method' => 'stripe',
+                'status' => 'completed',
+            ]);
 
-            $user = User::find($userId);
-            $panier = Panier::find($panierId);
-
-            if (!$user || !$panier) {
-                return redirect()->to('/checkout/result?status=error&message=Invalid+user+or+cart');
-            }
-
-            // Calculate total amount
-            $totalAmount = 0;
-            foreach ($panier->cours as $cours) {
-                $totalAmount += $cours->pivot->prix;
-            }
-
-            // Begin transaction
-            DB::beginTransaction();
-
-            try {
-                // Create transaction record
-                $transaction = Transaction::create([
-                    'user_id' => $userId,
-                    'panier_id' => $panierId,
-                    'total_amount' => $totalAmount,
-                    'payment_id' => $sessionId,
-                    'payment_method' => 'stripe',
-                    'status' => 'completed',
-                ]);
-
-                // Add courses to student's courses
-                $etudiant = $user->etudiant;
-                if ($etudiant) {
-                    foreach ($panier->cours as $cours) {
-                        if (!$etudiant->cours->contains($cours->id)) {
-                            $etudiant->cours()->attach($cours->id);
-                        }
+            // Add courses to student's courses
+            $etudiant = $user->etudiant;
+            if ($etudiant) {
+                foreach ($panier->cours as $cours) {
+                    if (!$etudiant->cours->contains($cours->id)) {
+                        $etudiant->cours()->attach($cours->id);
                     }
                 }
-
-                // Mark the cart as inactive
-                $panier->update(['is_active' => false]);
-
-                // Create a new empty cart for the user
-                Panier::create([
-                    'user_id' => $userId,
-                    'is_active' => true
-                ]);
-
-                DB::commit();
-
-                return redirect()->to('/checkout/result?status=success&transaction_id=' . $transaction->id);
-            } catch (\Exception $e) {
-                DB::rollBack();
-                return redirect()->to('/checkout/result?status=error&message=' . urlencode('Failed to process payment: ' . $e->getMessage()));
             }
-        } catch (ApiErrorException $e) {
-            return redirect()->to('/checkout/result?status=error&message=' . urlencode($e->getMessage()));
+
+            // Mark the cart as inactive
+            $panier->update(['is_active' => false]);
+
+            // Create a new empty cart for the user
+            Panier::create([
+                'user_id' => $userId,
+                'is_active' => true
+            ]);
+
+            DB::commit();
+
+            // Redirect to the React frontend URL, not Laravel route
+            // This should match your React router path
+            return redirect()->to(env('FRONTEND_URL') . '/checkout/result?status=success&transaction_id=' . $transaction->id);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return redirect()->to(env('FRONTEND_URL') .'/checkout/result?status=error&message=' . urlencode('Failed to process payment: ' . $e->getMessage()));
         }
+    } catch (ApiErrorException $e) {
+        return redirect()->to('/checkout/result?status=error&message=' . urlencode($e->getMessage()));
     }
+}
 
     /**
      * Handle cancelled payment

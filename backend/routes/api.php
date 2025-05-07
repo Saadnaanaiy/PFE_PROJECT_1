@@ -8,6 +8,7 @@ use App\Http\Controllers\InstructorLessonController;
 use App\Http\Controllers\MessageController;
 use App\Http\Controllers\PanierController;
 use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\AdministrateurController;
 use Illuminate\Support\Facades\Route;
@@ -65,6 +66,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Payment history
     Route::get('/payment/history', [PaymentController::class, 'getPaymentHistory']);
+
+    Route::get('/enrolled-courses', [TransactionController::class, 'getEnrolledCourses']);
 });
 
 // Instructor-specific routes

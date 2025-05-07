@@ -1,20 +1,10 @@
-import React, { useEffect, useState } from 'react';
-import { FiCheck, FiX, FiAlertTriangle, FiArrowLeft } from 'react-icons/fi';
-
-// Mock components to simulate the router functionality
-const Link = ({ to, className, children }) => (
-  <button className={className}>{children}</button>
-);
-
-// Simulating useSearchParams for demo purposes
-const useSearchParams = () => {
-  // For this demo, we'll always show the success state
-  return [new URLSearchParams('status=success&transaction_id=TXN123456789')];
-};
+import React, { useState, useEffect } from 'react';
+import { FiCheck, FiX, FiAlertTriangle } from 'react-icons/fi';
+import { Link, useSearchParams } from 'react-router-dom';
 
 const CheckoutResult = () => {
   const [searchParams] = useSearchParams();
-  const status = searchParams.get('status');
+  const status = searchParams.get('status') || 'unknown';
   const transactionId = searchParams.get('transaction_id');
   const errorMessage = searchParams.get('message');
 
@@ -165,7 +155,7 @@ const CheckoutResult = () => {
                 {message}
               </p>
 
-              {status === 'success' && (
+              {status === 'success' && transactionId && (
                 <div
                   className={`text-sm bg-neutral-50 p-4 rounded-md text-neutral-500 mb-8 w-full
                   transition-all duration-500 ease-out

@@ -17,6 +17,7 @@ import {
   FiMessageCircle,
   FiLock,
   FiMessageSquare,
+  FiShoppingCart,
 } from 'react-icons/fi';
 import axios from 'axios';
 import moroccanPattern from '../assets/moroccan-pattern.svg';
@@ -39,6 +40,8 @@ function AdminDashboard() {
     forums: [],
     discussions: [],
     messages: [],
+    transactions: [],
+    paniers: [],
   });
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('students');
@@ -67,6 +70,7 @@ function AdminDashboard() {
   const [previewUrl, setPreviewUrl] = useState('');
   const fileInputRef = useRef(null);
   const [selectedSpecialty, setSelectedSpecialty] = useState('');
+  const [showAll, setShowAll] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -85,6 +89,8 @@ function AdminDashboard() {
           forums: res.data[7] || [],
           discussions: res.data[8] || [],
           messages: res.data[9] || [],
+          transactions: res.data[10] || [],
+          paniers: res.data[11] || [],
         });
         console.log(dashboardData);
       } catch (err) {
@@ -675,13 +681,11 @@ function AdminDashboard() {
       count: dashboardData.categories?.length || 0,
       icon: <FiStar size={24} className="text-yellow-500" />,
     },
-
     {
       title: 'Sections',
       count: dashboardData.sections?.length || 0,
-      icon: <FiLock size={24} className="text-blue-500" />,
+      icon: <FiLock size={24} className="text-slate-500" />,
     },
-
     {
       title: 'Forums',
       count: dashboardData.forums?.length || 0,
@@ -690,16 +694,26 @@ function AdminDashboard() {
     {
       title: 'Discussions',
       count: dashboardData.discussions?.length || 0,
-      icon: <FiMessageSquare size={24} className="text-blue-500" />,
+      icon: <FiMessageSquare size={24} className="text-red-500" />,
     },
-
     {
       title: 'Messages',
       count: dashboardData.messages?.length || 0,
-      icon: <FiMessageSquare size={24} className="text-blue-500" />,
+      icon: <FiMessageSquare size={24} className="text-green-300" />,
+    },
+    {
+      title: 'Transactions',
+      count: dashboardData.transactions?.length || 0,
+      icon: <FiFileText size={24} className="text-indigo-500" />,
+    },
+    {
+      title: 'Active Carts',
+      count: dashboardData.paniers?.filter((p) => p.is_active)?.length || 0,
+      icon: <FiShoppingCart size={24} className="text-orange-500" />,
     },
   ];
 
+  const visibleStats = showAll ? stats : stats.slice(0, 8);
   return (
     <div className="min-h-screen bg-neutral-50 py-12 relative">
       <div
