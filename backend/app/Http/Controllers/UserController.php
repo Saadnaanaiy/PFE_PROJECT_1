@@ -247,67 +247,84 @@ class UserController extends Controller
     ], 200);
 }
 public function getInstructors() {
-    // Get instructors with related data
-    $instructeurs = User::where('role', 'instructeur')
+    // Get base instructor user data with their details, courses, and course-specific student counts
+    $instructeursUsers = User::where('role', 'instructeur') // These are User models
         ->with(['instructeur' => function($query) {
+            // Select specific fields for the instructor details
             $query->select('id', 'user_id', 'bio', 'specialite', 'image');
-            // Include courses created by the instructor
+
+            // Eager load courses related to the instructor
             $query->with(['cours' => function($coursQuery) {
+                // Select specific fields for each course
                 $coursQuery->select('id', 'titre', 'description', 'prix', 'niveau',
-                                   'image', 'instructeur_id', 'categorie_id');
-                // Count students enrolled in each course
-                $coursQuery->withCount('etudiants');
+                                     'image', 'instructeur_id', 'categorie_id');
+                // Add a count of students for each specific course
+                $coursQuery->withCount('etudiants'); // Appends 'etudiants_count' to each course object
             }]);
-            // Count courses created by the instructor
-            $query->withCount('cours');
+            // Add a count of total courses for the instructor
+            $query->withCount('cours'); // Appends 'cours_count' to the 'instructeur' related object
         }])
         ->get();
 
-    // Get total enrollment counts for each instructor
-    foreach ($instructeurs as $instructeur) {
-        if ($instructeur->instructeur) {
-            // Get instructor ID
-            $instructeurId = $instructeur->instructeur->id;
+    // Efficiently get unique student counts for all instructors in a single query.
+    // This assumes 'cours.instructeur_id' is the ID from your 'instructeurs' table (the one related via the 'instructeur' relationship).
+    $uniqueStudentCountsByInstructor = DB::table('cours')
+        ->join('etudiant_cours', 'cours.id', '=', 'etudiant_cours.cours_id')
+        ->select('cours.instructeur_id', DB::raw('COUNT(DISTINCT etudiant_cours.etudiant_id) as unique_students_total'))
+        ->whereIn('cours.instructeur_id', $instructeursUsers->pluck('instructeur.id')->filter()->all()) // Only query for relevant instructors
+        ->groupBy('cours.instructeur_id')
+        ->get()
+        ->keyBy('instructeur_id'); // Creates a collection keyed by 'instructeur_id' for easy lookup
 
-            // Count total enrollment records for this instructor's courses
-            $totalEnrollments = DB::table('etudiant_cours')
-                ->join('cours', 'etudiant_cours.cours_id', '=', 'cours.id')
-                ->where('cours.instructeur_id', $instructeurId)
-                ->count();
+    // Transform the collection to add unique student counts and format image URLs
+    $instructeursUsers->transform(function ($user) use ($uniqueStudentCountsByInstructor) {
+        if ($user->instructeur) { // Check if the User has an associated 'instructeur' details record
+            $instructeurDetails = $user->instructeur;
+            $instructeurId = $instructeurDetails->id; // This is the ID from the 'instructeurs' table
 
-            // Set the students_count property to the total enrollments
-            // This counts each student-course combination (not deduplicating students)
-            $instructeur->instructeur->students_count = $totalEnrollments;
+            // Assign the pre-calculated unique student count for this instructor
+            if (isset($uniqueStudentCountsByInstructor[$instructeurId])) {
+                // This is the count of unique students across all of this instructor's courses
+                $instructeurDetails->students_count = $uniqueStudentCountsByInstructor[$instructeurId]->unique_students_total;
+            } else {
+                // If the instructor has no courses or no students in any course, the count is 0
+                $instructeurDetails->students_count = 0;
+            }
 
-            // For debugging/comparison: Also get the unique student count
-            $uniqueStudentsCount = DB::table('etudiant_cours')
-                ->join('cours', 'etudiant_cours.cours_id', '=', 'cours.id')
-                ->where('cours.instructeur_id', $instructeurId)
-                ->select('etudiant_cours.etudiant_id')
-                ->distinct()
-                ->count();
+            // The original code had 'students_count' for total enrollments and 'unique_students_count' for distinct students.
+            // Now, 'students_count' directly stores the unique student count.
+            // If an old 'unique_students_count' property exists from previous logic, it can be removed or ignored
+            // as 'students_count' now serves this purpose.
+            if (property_exists($instructeurDetails, 'unique_students_count')) {
+                 unset($instructeurDetails->unique_students_count);
+            }
 
-            $instructeur->instructeur->unique_students_count = $uniqueStudentsCount;
+
+            // Transform the image URL: use stored image or a default
+            if (!empty($instructeurDetails->image)) {
+                $instructeurDetails->image = asset('storage/' . $instructeurDetails->image);
+            } else {
+                $instructeurDetails->image = asset('img/default-instructor.jpg'); // Provide a default image path
+            }
+
         } else {
-            $instructeur->instructeur->students_count = 0;
-            $instructeur->instructeur->unique_students_count = 0;
+            // This User (role='instructeur') does not have a related 'instructeur' details record.
+            // To ensure a consistent JSON structure, create a default 'instructeur' object.
+            $user->instructeur = (object) [
+                'id' => null, // No specific ID for the instructor details record
+                'user_id' => $user->id, // Link back to the User model's ID
+                'bio' => 'N/A',
+                'specialite' => 'N/A',
+                'image' => asset('img/default-instructor.jpg'), // Default image
+                'cours' => collect(), // Empty collection for courses
+                'cours_count' => 0,   // No related instructor details implies 0 courses via this relation
+                'students_count' => 0 // And consequently, 0 students
+            ];
         }
-    }
-
-    // Transform the instructeurs collection
-    $instructeurs->transform(function ($instructeur) {
-        // Transform the image URL if exists
-        if (isset($instructeur->instructeur->image)) {
-            $instructeur->instructeur->image = asset('storage/' . $instructeur->instructeur->image);
-        } else {
-            // Provide a default image URL
-            $instructeur->instructeur->image = asset('img/default-instructor.jpg');
-        }
-
-        return $instructeur;
+        return $user;
     });
 
-    return response()->json(['instructors' => $instructeurs]);
+    return response()->json(['instructors' => $instructeursUsers]);
 }
 
     /**

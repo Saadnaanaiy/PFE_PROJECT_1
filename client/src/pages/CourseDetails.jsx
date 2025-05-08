@@ -136,13 +136,21 @@ const CourseDetails = () => {
     });
   };
 
-  const handleEnroll = () => {
+  const handleEnroll = async () => {
     if (isCourseFree) {
       // Navigate to the course learning page if free
       navigate(`/course/${courseId}/learn`);
     } else {
       // Navigate to payment page if not free
-      navigate(`/payment/${courseId}`);
+     const response = await axios.post('/api/checkout');
+      console.log(response.data);
+
+      // Redirect to Stripe's checkout page
+      if (response.data.url) {
+        window.location.href = response.data.url;
+      } else {
+        throw new Error('No checkout URL returned');
+      }
     }
   };
 

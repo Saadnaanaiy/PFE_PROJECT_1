@@ -343,7 +343,6 @@ const CourseVideoView = ({ onBack }) => {
 
   const activeLesson = getActiveLesson();
   const activeSection = course?.curriculum?.[activeSectionIndex];
-  
 
   if (loading) {
     return (
