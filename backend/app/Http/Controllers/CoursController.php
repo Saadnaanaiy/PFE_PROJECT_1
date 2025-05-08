@@ -278,6 +278,14 @@ class CoursController extends Controller
         // This method is typically not used in API controllers
     }
 
+    public function updateProgress(Request $request, Cours $course)
+    {
+        $course->progress = $request->input('progress');
+        $course->save();
+
+        return response()->json(['data' => $course], 200);
+    }
+
     /**
      * Update the specified course in storage.
      *

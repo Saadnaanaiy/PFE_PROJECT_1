@@ -52,8 +52,9 @@ class TransactionController extends Controller
                     'description' => $cours->description,
                     'prix' => $cours->pivot->prix,
                     'niveau' => $cours->niveau,
-                    'image' => asset($cours->image), // Convert to full URL using asset()
+                    'image' => asset("/storage/" . $cours->image), // Convert to full URL using asset()
                     'dureeMinutes' => $cours->dureeMinutes,
+                    'progress'=>$cours->progress,
                     'dateCreation' => $cours->dateCreation,
                     'instructeur' => $cours->instructeur->user->nom,
                     'instructeur_image' => asset($cours->instructeur->user->image ?? 'images/default-instructor.png'), // Add instructor image with fallback

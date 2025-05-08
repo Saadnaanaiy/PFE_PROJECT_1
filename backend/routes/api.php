@@ -20,6 +20,7 @@ Route::post("/login", [UserController::class, "login"])->name("login");
 // Public course routes
 Route::get('/courses', [CoursController::class, 'index']);
 Route::get('/courses/{id}', [CoursController::class, 'show']);
+Route::match(['put','patch'], 'courses/{course}', [CoursController::class, 'updateProgress']);
 Route::get('/categories', [CoursController::class, 'getCategories']);
 Route::get('/courses/{id}/forums', [CoursController::class, 'getForums']);
 // Public : toutes les catégories
@@ -39,6 +40,7 @@ Route::get('/payment/cancel', [PaymentController::class, 'cancel'])->name('payme
 // Protected routes
 Route::middleware('auth:sanctum')->group(function () {
     Route::get("/user", [UserController::class, "profile"]);
+    Route::match(['put','patch'], 'courses/{course}', [CoursController::class, 'updateProgress']);
     Route::get("/users", [UserController::class, "index"]);
     Route::put("/profile/update", [UserController::class, "updateProfile"]);
     Route::delete("/profile/delete", [UserController::class, "delete"]);

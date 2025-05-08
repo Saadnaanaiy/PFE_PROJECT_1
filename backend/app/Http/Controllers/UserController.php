@@ -142,9 +142,30 @@ class UserController extends Controller
     }
 
     public function profile()
-    {
-        return response()->json(auth()->user());
+{
+    $user = auth()->user();
+    $userData = $user->toArray();
+
+    // Always put image in user.image property to match frontend expectations
+    if ($user->isEtudiant()) {
+        $etudiant = $user->etudiant;
+        if ($etudiant && $etudiant->image) {
+            $userData['image'] = asset($etudiant->image);
+        }
+    } elseif ($user->isInstructeur()) {
+        $instructeur = $user->instructeur;
+        if ($instructeur && $instructeur->image) {
+            $userData['image'] = asset($instructeur->image);
+        }
+    } elseif ($user->isAdmin()) {
+        $administrateur = $user->administrateur;
+        if ($administrateur && $administrateur->image) {
+            $userData['image'] = asset($administrateur->image);
+        }
     }
+
+    return response()->json($userData);
+}
 
     public function updateProfile(Request $request)
     {

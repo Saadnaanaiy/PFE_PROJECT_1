@@ -77,8 +77,10 @@ const CourseVideoView = ({ onBack }) => {
           reviewCount: courseData.reviews_count || 0,
           duration: `${Math.round(courseData.dureeMinutes / 60)} hours`,
           level: courseData.niveau || 'Beginner',
+          progress: courseData.progress,
           curriculum: [],
         };
+        console.log('transformedCourse: ', transformedCourse);
 
         // Transform sections and lessons
         if (courseData.sections && courseData.sections.length > 0) {
@@ -139,10 +141,42 @@ const CourseVideoView = ({ onBack }) => {
     fetchCourse();
   }, [courseId]);
 
-  // Initialize with first section expanded once course is loaded
+  const updateCourseProgress = async (progress) => {
+    try {
+      await axios.patch(`/api/courses/${courseId}`, {
+        progress, // field name matches what your CourseController@edit expects
+      });
+      console.log('Progress synced:', progress);
+    } catch (err) {
+      console.error('Failed to sync progress:', err);
+    }
+  };
   useEffect(() => {
-    if (course) {
-      setExpandedSections({ 0: true });
+    // This will run when the course is first loaded
+    if (course && course.progress) {
+      // Initialize completedLessons based on the saved progress
+      const savedProgress = course.progress;
+      const allLessons = course.curriculum.flatMap((section, sectionIndex) =>
+        section.lessons.map((lesson, lessonIndex) => ({
+          sectionIndex,
+          lessonIndex,
+        })),
+      );
+
+      // Calculate how many lessons should be marked as completed
+      const lessonCount = allLessons.length;
+      const completedCount = Math.floor((savedProgress / 100) * lessonCount);
+
+      // Mark the first N lessons as completed
+      const initialCompletedLessons = {};
+      for (let i = 0; i < completedCount; i++) {
+        if (i < allLessons.length) {
+          const { sectionIndex, lessonIndex } = allLessons[i];
+          initialCompletedLessons[`${sectionIndex}-${lessonIndex}`] = true;
+        }
+      }
+
+      setCompletedLessons(initialCompletedLessons);
     }
   }, [course]);
 
@@ -181,12 +215,41 @@ const CourseVideoView = ({ onBack }) => {
     });
   };
 
+  const calculateProgressFromLessons = (lessonsObj) => {
+    if (!course?.curriculum?.length) return 0;
+
+    const allLessons = course.curriculum.flatMap((section) => section.lessons);
+    const totalLessons = allLessons.length;
+    if (totalLessons === 0) return 0;
+
+    const completedCount = Object.keys(lessonsObj).reduce((count, key) => {
+      const [sectionIdx, lessonIdx] = key.split('-').map(Number);
+      const section = course.curriculum[sectionIdx];
+      if (section && section.lessons[lessonIdx]) {
+        return count + 1;
+      }
+      return count;
+    }, 0);
+
+    return Math.round((completedCount / totalLessons) * 100);
+  };
+
   const markLessonComplete = () => {
     const key = `${activeSectionIndex}-${activeLessonIndex}`;
-    setCompletedLessons({
-      ...completedLessons,
-      [key]: true,
-    });
+
+    // Only mark as complete if not already completed
+    if (!completedLessons[key]) {
+      const updatedCompletedLessons = {
+        ...completedLessons,
+        [key]: true,
+      };
+
+      setCompletedLessons(updatedCompletedLessons);
+
+      // Calculate and update progress immediately
+      const newProgress = calculateProgressFromLessons(updatedCompletedLessons);
+      updateCourseProgress(newProgress);
+    }
 
     // Automatically advance to next lesson if available
     const currentSection = course.curriculum[activeSectionIndex];
@@ -209,15 +272,36 @@ const CourseVideoView = ({ onBack }) => {
 
   // Calculate course progress
   const calculateProgress = () => {
-    if (!course) return 0;
+    // 1) No course or no sections => zero progress
+    if (!course?.curriculum?.length) return 0;
 
-    const totalLessons = course.curriculum.reduce(
-      (total, section) => total + section.lessons.length,
+    // 2) Flatten all lessons into a single array
+    const allLessons = course.curriculum.flatMap((section) => section.lessons);
+    const totalLessons = allLessons.length;
+    if (totalLessons === 0) return 0;
+
+    // 3) Count only those completed keys that map to an existing lesson
+    const completedCount = Object.keys(completedLessons).reduce(
+      (count, key) => {
+        const [sectionIdx, lessonIdx] = key.split('-').map(Number);
+        const section = course.curriculum[sectionIdx];
+        if (section && section.lessons[lessonIdx]) {
+          return count + 1;
+        }
+        return count;
+      },
       0,
     );
-    const completed = Object.keys(completedLessons).length;
-    return Math.round((completed / totalLessons) * 100);
+
+    // 4) Return rounded percentage
+    return Math.round((completedCount / totalLessons) * 100);
   };
+
+  useEffect(() => {
+    if (!course) return;
+    const newProgress = calculateProgress();
+    updateCourseProgress(newProgress);
+  }, [completedLessons, course]);
 
   // Moroccan zelij background styles with SVG patterns
   const moroccanStyles = {
@@ -259,6 +343,7 @@ const CourseVideoView = ({ onBack }) => {
 
   const activeLesson = getActiveLesson();
   const activeSection = course?.curriculum?.[activeSectionIndex];
+  
 
   if (loading) {
     return (

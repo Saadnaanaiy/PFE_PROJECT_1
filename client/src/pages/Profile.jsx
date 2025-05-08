@@ -80,7 +80,10 @@ const Profile = () => {
         try {
           // First check if the API path is correct - it should match your backend route
           const response = await axios.get(`/api/enrolled-courses`);
-          console.log('Student courses API response:', response.data);
+          console.log(
+            'RAW ENROLLED COURSES:',
+            response.data.data.enrolled_courses,
+          );
 
           // Fix: Access the correct path to enrolled_courses
           if (
@@ -396,7 +399,7 @@ const Profile = () => {
                               className="w-full h-full object-cover transition-transform hover:scale-105"
                               onError={() => handleImageError(course.id)}
                               // Show fallback if this specific image has failed
-                              style={{ display: failedImages.courses[course.id] ? 'none' : 'block' }}
+                              // style={{ display: failedImages.courses[course.id] ? 'none' : 'block' }}
                             />
                           )}
                           {/* Show fallback if this specific image has failed */}
@@ -407,7 +410,7 @@ const Profile = () => {
                           )}
                           <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-3">
                             <span className="text-xs font-medium px-2 py-1 bg-white/90 rounded-full text-primary">
-                              {course.categorie?.nom || 'Uncategorized'}
+                              {course.categorie || 'Uncategorized'}
                             </span>
                           </div>
                         </div>
@@ -453,7 +456,7 @@ const Profile = () => {
                             </Link>
                             <span className="text-xs text-neutral-500 flex items-center">
                               <FiClock className="mr-1" size={12} />{' '}
-                              {course.lastAccessed || 'Not started'}
+                              {(course.dureeMinutes / 60).toFixed(1) || 'Not started'} h
                             </span>
                           </div>
                         </div>
@@ -589,15 +592,20 @@ const Profile = () => {
                                 alt={course.titre}
                                 className="w-full h-full object-cover"
                                 onError={() => handleImageError(course.id)}
-                                style={{ display: failedImages.courses[course.id] ? 'none' : 'block' }}
+                                style={{
+                                  display: failedImages.courses[course.id]
+                                    ? 'none'
+                                    : 'block',
+                                }}
                               />
                             )}
                             {/* Show fallback if this specific image has failed */}
-                            {failedImages.courses[course.id] && course.image && (
-                              <div className="flex items-center justify-center h-full bg-neutral-800">
-                                <FiLayers className="text-white/90 text-4xl" />
-                              </div>
-                            )}
+                            {failedImages.courses[course.id] &&
+                              course.image && (
+                                <div className="flex items-center justify-center h-full bg-neutral-800">
+                                  <FiLayers className="text-white/90 text-4xl" />
+                                </div>
+                              )}
                             <div className="absolute bottom-2 right-2">
                               <span className="text-xs font-medium px-2 py-1 bg-white/90 rounded-full text-primary">
                                 {course.categorie?.nom || 'Uncategorized'}
@@ -612,7 +620,6 @@ const Profile = () => {
                               {course.titre}
                             </Link>
                             <div className="flex justify-between text-sm text-neutral-600">
-                              
                               <Link
                                 to={`/instructor/courses/${course.id}/edit`}
                                 className="text-primary hover:underline"
@@ -652,7 +659,9 @@ const Profile = () => {
                 {isAdmin ? (
                   // Admins get an FiShield icon instead of an image
                   <FiShield className="text-primary w-10 h-10" />
-                ) : isInstructor && instructorData?.image && !failedImages.profile ? (
+                ) : isInstructor &&
+                  instructorData?.image &&
+                  !failedImages.profile ? (
                   // Instructor image from instructorData
                   <img
                     src={instructorData.image}
@@ -712,7 +721,6 @@ const Profile = () => {
                   </>
                 ) : null}
               </div>
-
 
               <button
                 onClick={logout}
