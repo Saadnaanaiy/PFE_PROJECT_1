@@ -1,7 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import PropTypes from 'prop-types';
 import axios from 'axios';
+import Echo from 'laravel-echo';
+import Pusher from 'pusher-js';
 import {
   FiChevronLeft,
   FiCheck,
@@ -20,17 +22,23 @@ import {
   FiFileText,
   FiChevronRight,
   FiX,
+  FiSend,
 } from 'react-icons/fi';
 import VideoPlayer from './VideoPlayer';
 
-// Moroccan color palette
+// Moroccan color palette - updated with authentic Moroccan colors
 const moroccanColors = {
-  primary: '#E63946', // Vibrant red
-  secondary: '#2A9D8F', // Teal
-  tertiary: '#F4A261', // Sandy orange
-  accent1: '#E9C46A', // Gold
-  accent2: '#264653', // Deep blue
-  accent3: '#5F4B8B', // Royal purple
+  primary: '#C4122F',    // Moroccan red (flag color)
+  secondary: '#006233',  // Moroccan green (flag color)
+  tertiary: '#E8B42A',   // Moroccan gold/yellow
+  accent1: '#227C9D',    // Moroccan blue (zellige tile color)
+  accent2: '#852E2C',    // Moroccan terracotta
+  accent3: '#5A3921',    // Moroccan cedar wood
+  light1: '#F9F5E7',     // Light sand color
+  light2: '#FDEBD3',     // Light beige
+  dark1: '#2D2926',      // Deep charcoal
+  gradient1: 'linear-gradient(135deg, #C4122F 0%, #852E2C 100%)',
+  gradient2: 'linear-gradient(135deg, #006233 0%, #227C9D 100%)',
 };
 
 // Function to fix duplicate URL prefixes in image paths
@@ -53,10 +61,111 @@ const CourseVideoView = ({ onBack }) => {
   const [completedLessons, setCompletedLessons] = useState({});
   const [notes, setNotes] = useState('');
   const [activeTab, setActiveTab] = useState('content');
+  const [messages, setMessages] = useState([]);
+  const [newMessage, setNewMessage] = useState('');
+  const [currentDiscussionId, setCurrentDiscussionId] = useState(null);
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
+  const messagesEndRef = useRef(null);
   const [course, setCourse] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  // Get current user information
+  const [currentUser, setCurrentUser] = useState(null);
+
+  // Fetch current user data
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+      try {
+        const response = await axios.get('/api/user');
+        if (response.data) {
+          const userData = response.data.data || response.data;
+          setCurrentUser(userData);
+          // Store user ID in localStorage for cross-tab identification
+          localStorage.setItem('user_id', userData.id);
+          console.log('Current user data loaded:', userData);
+        }
+      } catch (error) {
+        console.error('Error fetching current user:', error);
+      }
+    };
+
+    fetchCurrentUser();
+  }, []);
+
+  // Initialize Echo for real-time messaging (if available)
+  useEffect(() => {
+    try {
+      // Check if we have the required environment variables
+      const pusherKey = import.meta.env.VITE_PUSHER_APP_KEY;
+      const pusherCluster = import.meta.env.VITE_PUSHER_APP_CLUSTER;
+      
+      // Only initialize Echo if we have the required configuration
+      if (pusherKey) {
+        console.log('Initializing Laravel Echo with Pusher');
+        window.Pusher = Pusher;
+        window.Echo = new Echo({
+          broadcaster: 'pusher',
+          key: pusherKey,
+          cluster: pusherCluster || 'mt1',
+          // No authentication needed for public channels
+          authEndpoint: '/api/broadcasting/auth',
+          // Add CSRF token to requests
+          csrfToken: document.querySelector('meta[name="csrf-token"]')?.getAttribute('content'),
+        });
+      } else {
+        console.log('Pusher configuration not found, real-time messaging disabled');
+      }
+    } catch (error) {
+      console.error('Error initializing Echo:', error);
+    }
+
+    return () => {
+      if (window.Echo) {
+        try {
+          window.Echo.disconnect();
+        } catch (error) {
+          console.error('Error disconnecting Echo:', error);
+        }
+      }
+    };
+  }, []);
+
+  // Subscribe to discussion channel when discussionId changes
+  useEffect(() => {
+    if (!currentDiscussionId || !window.Echo) return;
+
+    try {
+      // Use public channel instead of private to avoid authentication issues
+      const channel = window.Echo.channel(`discussion.${currentDiscussionId}`);
+      
+      console.log(`Subscribing to public channel: discussion.${currentDiscussionId}`);
+      
+      channel.listen('NewMessageEvent', (event) => {
+        console.log('Received new message event:', event);
+        setMessages(prevMessages => [...prevMessages, event.message || event]);
+      });
+
+      return () => {
+        try {
+          channel.stopListening('NewMessageEvent');
+        } catch (error) {
+          console.error('Error stopping Echo listener:', error);
+        }
+      };
+    } catch (error) {
+      console.error('Error subscribing to discussion channel:', error);
+      return () => {};
+    }
+  }, [currentDiscussionId]);
+
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages]);
 
   // Fetch course data
   useEffect(() => {
@@ -78,6 +187,7 @@ const CourseVideoView = ({ onBack }) => {
           duration: `${Math.round(courseData.dureeMinutes / 60)} hours`,
           level: courseData.niveau || 'Beginner',
           progress: courseData.progress,
+          forums: courseData.forums || [],
           curriculum: [],
         };
         console.log('transformedCourse: ', transformedCourse);
@@ -344,6 +454,50 @@ const CourseVideoView = ({ onBack }) => {
   const activeLesson = getActiveLesson();
   const activeSection = course?.curriculum?.[activeSectionIndex];
 
+  // Fetch messages for a discussion
+  const fetchMessages = async (discussionId) => {
+    if (!discussionId) return;
+    
+    setIsLoadingMessages(true);
+    try {
+      const response = await axios.get(`/api/discussions/${discussionId}/messages`);
+      setMessages(response.data.data || []);
+      setCurrentDiscussionId(discussionId);
+    } catch (error) {
+      console.error('Error fetching messages:', error);
+    } finally {
+      setIsLoadingMessages(false);
+    }
+  };
+
+  // Send a new message
+  const sendMessage = async (e) => {
+    e.preventDefault();
+    if (!newMessage.trim() || !currentDiscussionId) return;
+
+    try {
+      const response = await axios.post(`/api/discussions/${currentDiscussionId}/messages`, {
+        contenu: newMessage
+      });
+      
+      // If Echo isn't working, manually add the message to the UI
+      if (!window.Echo) {
+        const newMsg = response.data.data;
+        setMessages(prevMessages => [...prevMessages, newMsg]);
+      }
+      
+      setNewMessage('');
+    } catch (error) {
+      console.error('Error sending message:', error);
+    }
+  };
+
+  // Format date for messages
+  const formatMessageDate = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleString();
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-orange-50 to-red-50">
@@ -598,7 +752,7 @@ const CourseVideoView = ({ onBack }) => {
             {/* Content tabs */}
             <div className="mt-6 border-b border-neutral-200">
               <div className="flex">
-                {['content', 'notes', 'discussions'].map((tab) => (
+                {['content', 'discussions'].map((tab) => (
                   <button
                     key={tab}
                     onClick={() => setActiveTab(tab)}
@@ -895,53 +1049,192 @@ const CourseVideoView = ({ onBack }) => {
                         />
                         Lesson Discussion
                       </h3>
-                      <button
-                        className="px-4 py-2 text-white rounded-md hover:shadow-md flex items-center transition-all"
-                        style={{ background: moroccanStyles.buttonGradient }}
-                      >
-                        <FiMessageSquare className="mr-2" />
-                        Ask a Question
-                      </button>
-                    </div>
-
-                    <div className="bg-neutral-50 p-6 rounded-lg border border-neutral-200 text-center relative overflow-hidden">
-                      {/* Moroccan decorative element */}
-                      <div className="absolute inset-0 opacity-5">
-                        <div
-                          className="w-full h-full"
-                          style={{
-                            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 120 120' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M60 10 L110 60 L60 110 L10 60 Z' fill='none' stroke='%23${moroccanColors.primary.substring(
-                              1,
-                            )}' stroke-width='1'/%3E%3Ccircle cx='60' cy='60' r='20' fill='none' stroke='%23${moroccanColors.secondary.substring(
-                              1,
-                            )}' stroke-width='1'/%3E%3C/svg%3E")`,
-                            backgroundSize: '60px',
-                            backgroundPosition: 'center',
-                          }}
-                        ></div>
-                      </div>
-
-                      <div className="relative z-10">
-                        <div
-                          className="w-16 h-16 bg-neutral-100 rounded-full flex items-center justify-center mx-auto mb-3"
-                          style={{ background: `${moroccanColors.accent1}15` }}
-                        >
-                          <FiMessageSquare
-                            className="text-2xl"
-                            style={{ color: moroccanColors.accent1 }}
-                          />
+                      
+                      {course?.forums && course.forums.length > 0 ? (
+                        <div className="flex items-center">
+                          <select 
+                            className="mr-3 px-3 py-2 border border-neutral-200 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                            onChange={(e) => fetchMessages(e.target.value)}
+                            style={{ borderColor: `${moroccanColors.accent1}40` }}
+                          >
+                            <option value="">Select a discussion</option>
+                            {course.forums.flatMap(forum => 
+                              forum.discussions.map(discussion => (
+                                <option key={discussion.id} value={discussion.id}>
+                                  {discussion.contenu}
+                                </option>
+                              ))
+                            )}
+                          </select>
+                          <button
+                            className="px-4 py-2 text-white rounded-md hover:shadow-md flex items-center transition-all"
+                            style={{ background: moroccanStyles.buttonGradient }}
+                          >
+                            <FiMessageSquare className="mr-2" />
+                            New Discussion
+                          </button>
                         </div>
-                        <h4 className="font-medium text-lg text-neutral-700 mb-2">
-                          No discussions yet
-                        </h4>
-                        <p className="text-neutral-600 mb-1">
-                          No questions have been asked about this lesson yet.
-                        </p>
-                        <p className="text-sm text-neutral-500">
-                          Be the first to start a discussion!
-                        </p>
-                      </div>
+                      ) : (
+                        <button
+                          className="px-4 py-2 text-white rounded-md hover:shadow-md flex items-center transition-all"
+                          style={{ background: moroccanStyles.buttonGradient }}
+                        >
+                          <FiMessageSquare className="mr-2" />
+                          Start a Discussion
+                        </button>
+                      )}
                     </div>
+
+                    {currentDiscussionId ? (
+                      <div className="bg-white rounded-lg border border-neutral-200 overflow-hidden">
+                        {/* Messages container */}
+                        <div className="h-96 overflow-y-auto p-4 bg-neutral-50">
+                          {isLoadingMessages ? (
+                            <div className="flex justify-center items-center h-full">
+                              <div 
+                                className="w-10 h-10 border-4 rounded-full animate-spin"
+                                style={{ borderColor: `${moroccanColors.primary} transparent ${moroccanColors.secondary} transparent` }}
+                              ></div>
+                            </div>
+                          ) : messages.length > 0 ? (
+                            <div className="space-y-4">
+                               {messages.map((message, index) => {
+                                // Get the current user ID from state, localStorage, or course data
+                                // This determines if the message appears on the right or left
+                                const currentUserId = currentUser?.id || localStorage.getItem('user_id') || (course?.user_id || 0);
+                                const isCurrentUser = message.user?.id === parseInt(currentUserId);
+                                
+                                // Log message data for debugging
+                                console.log('Message data:', message);
+                                console.log('Current user ID:', currentUserId);
+                                console.log('Message user ID:', message.user?.id);
+                                console.log('Is current user:', isCurrentUser);
+                                
+                                return (
+                                  <div 
+                                    key={message.id || index} 
+                                    className="mb-4"
+                                  >
+                                    {/* Message bubble with user info */}
+                                    <div className={`flex items-start ${isCurrentUser ? 'justify-end' : 'justify-start'}`}>
+                                      
+                                      
+                                      {/* Message content */}
+                                      <div className={`max-w-[80%] rounded-lg p-3 ${isCurrentUser ? 'rounded-tr-none' : 'rounded-tl-none'}`}
+                                           style={{
+                                             backgroundColor: isCurrentUser ? '#006233' : '#FDEBD3',
+                                             color: isCurrentUser ? 'white' : '#333'
+                                           }}>
+                                        {/* User name and time */}
+                                        <div className="flex items-center mb-1">
+                                          <span className="text-xs font-medium" 
+                                                style={{ color: isCurrentUser ? 'rgba(255,255,255,0.9)' : '#C4122F' }}>
+                                            {message.user ? `${message.user.prenom || ''} ${message.user.nom || ''}`.trim() : 'Unknown'}
+                                          </span>
+                                          <span className="text-xs ml-2 opacity-70" 
+                                                style={{ color: isCurrentUser ? 'rgba(255,255,255,0.7)' : '#666' }}>
+                                            {formatMessageDate(message.dateEnvoi)}
+                                          </span>
+                                        </div>
+                                        
+                                        {/* Message text */}
+                                        <p className="text-sm">
+                                          {message.contenu}
+                                        </p>
+                                      </div>
+                                      
+                                      
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                              <div ref={messagesEndRef} />
+                            </div>
+                          ) : (
+                            <div className="flex flex-col items-center justify-center h-full">
+                              <div
+                                className="w-16 h-16 bg-neutral-100 rounded-full flex items-center justify-center mx-auto mb-3"
+                                style={{ background: `${moroccanColors.accent1}15` }}
+                              >
+                                <FiMessageSquare
+                                  className="text-2xl"
+                                  style={{ color: moroccanColors.accent1 }}
+                                />
+                              </div>
+                              <h4 className="font-medium text-lg text-neutral-700 mb-2">
+                                No messages yet
+                              </h4>
+                              <p className="text-neutral-600 mb-1 text-center">
+                                Be the first to send a message in this discussion!
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                        
+                        {/* Message input form */}
+                        <form onSubmit={sendMessage} className="p-3 border-t border-neutral-200 bg-white">
+                          <div className="flex items-center">
+                            <input
+                              type="text"
+                              value={newMessage}
+                              onChange={(e) => setNewMessage(e.target.value)}
+                              placeholder="Type your message here..."
+                              className="flex-1 p-2 border border-neutral-300 rounded-l-md focus:outline-none"
+                              style={{ borderColor: `${moroccanColors.accent1}40` }}
+                            />
+                            <button
+                              type="submit"
+                              className="px-4 py-2 rounded-r-md text-white"
+                              style={{ background: moroccanStyles.buttonGradient }}
+                              disabled={!newMessage.trim()}
+                            >
+                              <FiSend />
+                            </button>
+                          </div>
+                        </form>
+                      </div>
+                    ) : (
+                      <div className="bg-neutral-50 p-6 rounded-lg border border-neutral-200 text-center relative overflow-hidden">
+                        {/* Moroccan decorative element */}
+                        <div className="absolute inset-0 opacity-5">
+                          <div
+                            className="w-full h-full"
+                            style={{
+                              backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 120 120' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M60 10 L110 60 L60 110 L10 60 Z' fill='none' stroke='%23${moroccanColors.primary.substring(
+                                1,
+                              )}' stroke-width='1'/%3E%3Ccircle cx='60' cy='60' r='20' fill='none' stroke='%23${moroccanColors.secondary.substring(
+                                1,
+                              )}' stroke-width='1'/%3E%3C/svg%3E")`,
+                              backgroundSize: '60px',
+                              backgroundPosition: 'center',
+                            }}
+                          ></div>
+                        </div>
+
+                        <div className="relative z-10">
+                          <div
+                            className="w-16 h-16 bg-neutral-100 rounded-full flex items-center justify-center mx-auto mb-3"
+                            style={{ background: `${moroccanColors.accent1}15` }}
+                          >
+                            <FiMessageSquare
+                              className="text-2xl"
+                              style={{ color: moroccanColors.accent1 }}
+                            />
+                          </div>
+                          <h4 className="font-medium text-lg text-neutral-700 mb-2">
+                            Select a Discussion
+                          </h4>
+                          <p className="text-neutral-600 mb-1">
+                            Please select a discussion from the dropdown above to view and send messages.
+                          </p>
+                          {(!course?.forums || course.forums.length === 0) && (
+                            <p className="text-sm text-neutral-500">
+                              No discussions available for this course yet.
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

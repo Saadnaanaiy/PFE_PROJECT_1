@@ -55,6 +55,6 @@ class NewMessageEvent implements ShouldBroadcast
      */
     public function broadcastOn()
     {
-        return new PrivateChannel('discussion.' . $this->message->discussion_id);
+        return new Channel('discussion.' . $this->message->discussion_id);
     }
 }

@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import Echo from 'laravel-echo';
+import Pusher from 'pusher-js';
 import {
   FiPlay,
   FiClock,
@@ -26,12 +28,110 @@ const CourseDetails = () => {
   const [showNewForumForm, setShowNewForumForm] = useState(false);
   const [newMessage, setNewMessage] = useState('');
   const [activeForumId, setActiveForumId] = useState(null);
+  const [activeDiscussionId, setActiveDiscussionId] = useState(null);
+  const messagesEndRef = useRef(null);
   const [expandedSections, setExpandedSections] = useState({});
   const [course, setCourse] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [userRole, setUserRole] = useState(null); // 'instructeur', 'etudiant', or null
   const [isCourseFree, setIsCourseFree] = useState(false);
+
+  // Initialize Echo for real-time messaging
+  useEffect(() => {
+    try {
+      // Check if we have the required environment variables
+      const pusherKey = import.meta.env.VITE_PUSHER_APP_KEY;
+      const pusherCluster = import.meta.env.VITE_PUSHER_APP_CLUSTER;
+      
+      // Only initialize Echo if we have the required configuration
+      if (pusherKey) {
+        console.log('Initializing Laravel Echo with Pusher');
+        window.Pusher = Pusher;
+        window.Echo = new Echo({
+          broadcaster: 'pusher',
+          key: pusherKey,
+          cluster: pusherCluster || 'mt1',
+          // No authentication needed for public channels
+          authEndpoint: '/api/broadcasting/auth',
+          // Add CSRF token to requests
+          csrfToken: document.querySelector('meta[name="csrf-token"]')?.getAttribute('content'),
+        });
+      } else {
+        console.log('Pusher configuration not found, real-time messaging disabled');
+      }
+    } catch (error) {
+      console.error('Error initializing Echo:', error);
+    }
+
+    return () => {
+      if (window.Echo) {
+        try {
+          window.Echo.disconnect();
+        } catch (error) {
+          console.error('Error disconnecting Echo:', error);
+        }
+      }
+    };
+  }, []);
+
+  // Subscribe to discussion channel when discussionId changes
+  useEffect(() => {
+    if (!activeDiscussionId || !window.Echo) return;
+
+    try {
+      // Use public channel instead of private to avoid authentication issues
+      const channel = window.Echo.channel(`discussion.${activeDiscussionId}`);
+      
+      console.log(`Subscribing to public channel: discussion.${activeDiscussionId}`);
+      
+      channel.listen('NewMessageEvent', (event) => {
+        console.log('Received new message event:', event);
+        
+        // Update the course data to include the new message
+        setCourse(prevCourse => {
+          if (!prevCourse || !prevCourse.forums) return prevCourse;
+          
+          // Find the active forum
+          const updatedForums = prevCourse.forums.map(forum => {
+            // Find the active discussion
+            if (forum.id === activeForumId) {
+              const updatedDiscussions = forum.discussions.map(discussion => {
+                if (discussion.id === activeDiscussionId) {
+                  // Add the new message to the discussion
+                  return {
+                    ...discussion,
+                    messages: [...(discussion.messages || []), event.message || event]
+                  };
+                }
+                return discussion;
+              });
+              return { ...forum, discussions: updatedDiscussions };
+            }
+            return forum;
+          });
+          
+          return { ...prevCourse, forums: updatedForums };
+        });
+      });
+
+      return () => {
+        try {
+          channel.stopListening('NewMessageEvent');
+        } catch (error) {
+          console.error('Error stopping Echo listener:', error);
+        }
+      };
+    } catch (error) {
+      console.error('Error subscribing to discussion channel:', error);
+      return () => {};
+    }
+  }, [activeDiscussionId, activeForumId]);
+
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [course?.forums]);
 
   // Fetch course details and check user role
   useEffect(() => {
@@ -182,19 +282,22 @@ const CourseDetails = () => {
 
   // Handle sending a message in a forum
   const handleSendMessage = async () => {
-    if (!newMessage.trim() || !activeForumId) return;
+    if (!newMessage.trim() || !activeDiscussionId) return;
 
     try {
-      // In a real app, you would make an API call to send a message
-      await axios.post(`/api/forums/${activeForumId}/discussions`, {
+      // Send the message to the discussion
+      const response = await axios.post(`/api/discussions/${activeDiscussionId}/messages`, {
         contenu: newMessage,
-        dateCreation: new Date().toISOString(),
-        forum_id: activeForumId,
       });
 
-      // Refresh forum data
-      const response = await axios.get(`/api/courses/${courseId}`);
-      setCourse(response.data.data);
+      console.log('Message sent successfully:', response.data);
+
+      // If Echo isn't working, manually update the UI
+      if (!window.Echo) {
+        // Refresh forum data
+        const courseResponse = await axios.get(`/api/courses/${courseId}`);
+        setCourse(courseResponse.data.data);
+      }
 
       // Reset message field
       setNewMessage('');
@@ -630,7 +733,10 @@ const CourseDetails = () => {
                             <div>
                               <div className="flex items-center mb-4">
                                 <button
-                                  onClick={() => setActiveForumId(null)}
+                                  onClick={() => {
+                                    setActiveForumId(null);
+                                    setActiveDiscussionId(null);
+                                  }}
                                   className="mr-3 text-primary hover:underline"
                                 >
                                   ← Back to Forums
@@ -655,41 +761,54 @@ const CourseDetails = () => {
                               </div>
 
                               <div className="space-y-4 mb-6">
-                                {getActiveForum().discussions?.map(
-                                  (discussion) => (
+                                {/* Show discussion title */}
+                              <div className="mb-6 p-4 bg-neutral-50 rounded-lg border border-neutral-200">
+                                <h4 className="font-semibold text-lg mb-1">
+                                  Discussion: {getActiveForum().discussions?.find(d => d.id === activeDiscussionId)?.titre || 'Untitled Discussion'}
+                                </h4>
+                                <p className="text-neutral-600">
+                                  {getActiveForum().discussions?.find(d => d.id === activeDiscussionId)?.contenu || 'No description available'}
+                                </p>
+                              </div>
+                              
+                              {/* Messages list */}
+                              <div className="space-y-4 mb-6 max-h-96 overflow-y-auto p-2">
+                                {getActiveForum().discussions?.find(d => d.id === activeDiscussionId)?.messages?.map(
+                                  (message) => (
                                     <div
-                                      key={discussion.id}
+                                      key={message.id}
                                       className={`p-4 rounded-lg ${
-                                        discussion.user?.role === 'instructeur'
+                                        message.user?.role === 'instructeur'
                                           ? 'bg-primary/5 border-l-4 border-primary'
                                           : 'bg-white border border-neutral-200'
                                       }`}
                                     >
                                       <div className="flex items-center mb-2">
                                         <span className="font-medium mr-2">
-                                          {discussion.user?.nom || 'Anonymous'}
+                                          {message.user?.nom || 'Anonymous'}
                                         </span>
-                                        {discussion.user?.role ===
+                                        {message.user?.role ===
                                           'instructeur' && (
                                           <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">
                                             Instructor
                                           </span>
                                         )}
                                         <span className="text-sm text-neutral-500 ml-auto">
-                                          {formatDate(discussion.dateCreation)}
+                                          {formatDate(message.dateEnvoi)}
                                         </span>
                                       </div>
                                       <p className="text-neutral-700">
-                                        {discussion.contenu}
+                                        {message.contenu}
                                       </p>
                                     </div>
                                   ),
                                 )}
+                                <div ref={messagesEndRef} />
+                              </div>
                               </div>
 
-                              {/* Only allow replies if user is enrolled or is instructor */}
-                              {(userRole === 'instructeur' ||
-                                userRole === 'etudiant') && (
+                              {/* Only allow instructors to add messages */}
+                              {userRole === 'instructeur' && (
                                 <div className="mt-4">
                                   <label className="block text-sm font-medium text-neutral-700 mb-1">
                                     Post a Reply
@@ -707,6 +826,7 @@ const CourseDetails = () => {
                                     <button
                                       onClick={handleSendMessage}
                                       className="bg-primary text-white px-4 rounded-r-md hover:bg-primary-dark transition-colors flex items-center"
+                                      disabled={!newMessage.trim()}
                                     >
                                       <FiSend />
                                     </button>
@@ -717,8 +837,15 @@ const CourseDetails = () => {
                               {!userRole && (
                                 <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-md text-yellow-700">
                                   <p>
-                                    Please log in and enroll in this course to
-                                    participate in discussions.
+                                    Please log in to view discussions.
+                                  </p>
+                                </div>
+                              )}
+                              
+                              {userRole === 'etudiant' && (
+                                <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-md text-blue-700">
+                                  <p>
+                                    Only instructors can add discussions in this forum.
                                   </p>
                                 </div>
                               )}
@@ -746,10 +873,16 @@ const CourseDetails = () => {
                                   )}
                                 </div>
                                 <button
-                                  onClick={() => setActiveForumId(forum.id)}
+                                  onClick={() => {
+                                    setActiveForumId(forum.id);
+                                    // If there's at least one discussion, select the first one
+                                    if (forum.discussions && forum.discussions.length > 0) {
+                                      setActiveDiscussionId(forum.discussions[0].id);
+                                    }
+                                  }}
                                   className="text-primary hover:text-primary-dark flex items-center"
                                 >
-                                  View Discussion
+                                  View Discussions
                                 </button>
                               </div>
                             </div>

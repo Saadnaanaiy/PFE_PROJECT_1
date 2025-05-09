@@ -388,7 +388,7 @@ class CoursController extends Controller
      */
     public function getCategories()
     {
-        $categories = Categorie::all();
+        $categories = Categorie::withcount('cours')->get();
 
         return response()->json([
             'status' => 'success',

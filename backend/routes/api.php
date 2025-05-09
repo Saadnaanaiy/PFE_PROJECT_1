@@ -36,6 +36,7 @@ Route::post('/stripe/webhook', [PaymentController::class, 'handleWebhook']);
 // Payment success and cancel routes need to be accessible without auth
 Route::get('/payment/success', [PaymentController::class, 'success'])->name('payment.success');
 Route::get('/payment/cancel', [PaymentController::class, 'cancel'])->name('payment.cancel');
+Route::get("/instructors", [UserController::class, "getInstructors"]);
 
 // Protected routes
 Route::middleware('auth:sanctum')->group(function () {

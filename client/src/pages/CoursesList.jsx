@@ -45,6 +45,7 @@ const CoursesList = () => {
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [showAllCourses, setShowAllCourses] = useState(false);
 
   // Filter states
   const [selectedCategory, setSelectedCategory] = useState('');
@@ -381,9 +382,18 @@ const CoursesList = () => {
         {/* Results Count */}
         <div className="mb-6 flex justify-between items-center">
           <p className="text-neutral-600">
-            Showing <span className="font-medium">{sortedCourses.length}</span>{' '}
+            Showing <span className="font-medium">{showAllCourses ? sortedCourses.length : Math.min(3, sortedCourses.length)}</span>{' '}
+            {showAllCourses ? 'of ' : ''}<span className="font-medium">{showAllCourses ? sortedCourses.length : ''}</span>{' '}
             results
           </p>
+          {sortedCourses.length > 3 && (
+            <button
+              onClick={() => setShowAllCourses(!showAllCourses)}
+              className="px-4 py-2 rounded-md bg-primary text-white hover:bg-primary/90 transition-colors flex items-center gap-2"
+            >
+              {showAllCourses ? 'Show Less' : 'View All'}
+            </button>
+          )}
         </div>
         {/* Courses Grid/List */}
         {sortedCourses.length === 0 && !loading ? (
@@ -397,13 +407,13 @@ const CoursesList = () => {
           </div>
         ) : viewMode === 'grid' ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {sortedCourses.map((course) => (
+            {(showAllCourses ? sortedCourses : sortedCourses.slice(0, 3)).map((course) => (
               <CourseCard key={course.id} course={course} />
             ))}
           </div>
         ) : (
           <div className="space-y-4">
-            {sortedCourses.map((course) => (
+            {(showAllCourses ? sortedCourses : sortedCourses.slice(0, 3)).map((course) => (
               <div
                 key={course.id}
                 className="bg-white rounded-xl shadow-card overflow-hidden flex flex-col md:flex-row transition-shadow duration-300 hover:shadow-lg"

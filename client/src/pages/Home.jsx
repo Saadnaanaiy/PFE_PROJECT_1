@@ -1,6 +1,6 @@
 import Hero from '../components/Hero';
 import Categories from '../components/Categories';
-import CoursesList from '../components/CoursesList';
+import CoursesList from '../pages/CoursesList';
 import FeaturedInstructors from '../components/FeaturedInstructors';
 import Testimonials from '../components/Testimonials';
 import CTASection from '../components/CTASection';
@@ -126,12 +126,7 @@ const Home = () => {
     <div className="bg-neutral-50">
       <Hero />
       <Categories />
-      <CoursesList
-        title="Popular Courses"
-        subtitle="Discover our most highly-rated and in-demand courses"
-        courses={courses}
-      />
-      <FeaturedInstructors />
+      <CoursesList courses={courses} />
       <Testimonials />
       <CTASection />
     </div>
