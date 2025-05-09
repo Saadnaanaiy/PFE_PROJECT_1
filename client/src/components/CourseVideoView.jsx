@@ -1125,13 +1125,34 @@ const CourseVideoView = ({ onBack }) => {
                                              backgroundColor: isCurrentUser ? '#006233' : '#FDEBD3',
                                              color: isCurrentUser ? 'white' : '#333'
                                            }}>
-                                        {/* User name and time */}
+                                        {/* User name, role, and time */}
                                         <div className="flex items-center mb-1">
-                                          <span className="text-xs font-medium" 
-                                                style={{ color: isCurrentUser ? 'rgba(255,255,255,0.9)' : '#C4122F' }}>
-                                            {message.user ? `${message.user.prenom || ''} ${message.user.nom || ''}`.trim() : 'Unknown'}
-                                          </span>
-                                          <span className="text-xs ml-2 opacity-70" 
+                                          <div className="flex items-center">
+                                            <span className="text-xs font-medium" 
+                                                  style={{ color: isCurrentUser ? 'rgba(255,255,255,0.9)' : '#C4122F' }}>
+                                              {message.user ? `${message.user.prenom || ''} ${message.user.nom || ''}`.trim() : 'Unknown'}
+                                            </span>
+                                            {message.user?.role && (
+                                              <span 
+                                                className="text-xs ml-1 px-1.5 py-0.5 rounded-full" 
+                                                style={{
+                                                  backgroundColor: isCurrentUser 
+                                                    ? 'rgba(255,255,255,0.2)' 
+                                                    : message.user.role === 'instructeur' 
+                                                      ? '#C4122F15' 
+                                                      : '#00623315',
+                                                  color: isCurrentUser 
+                                                    ? 'rgba(255,255,255,0.9)' 
+                                                    : message.user.role === 'instructeur' 
+                                                      ? '#C4122F' 
+                                                      : '#006233'
+                                                }}
+                                              >
+                                                {message.user.role === 'instructeur' ? 'Instructor' : 'Student'}
+                                              </span>
+                                            )}
+                                          </div>
+                                          <span className="text-xs ml-auto opacity-70" 
                                                 style={{ color: isCurrentUser ? 'rgba(255,255,255,0.7)' : '#666' }}>
                                             {formatMessageDate(message.dateEnvoi)}
                                           </span>
