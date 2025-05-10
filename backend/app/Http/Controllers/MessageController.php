@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Message;
 use App\Models\Discussion;
 use App\Events\NewMessageEvent;
+use App\Events\UserTypingEvent;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
@@ -71,6 +72,43 @@ class MessageController extends Controller
             'success' => true,
             'message' => 'Message sent successfully',
             'data' => $message
+        ]);
+    }
+    
+    /**
+     * Handle user typing indicator.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  int  $discussionId
+     * @return \Illuminate\Http\Response
+     */
+    public function typing(Request $request, $discussionId)
+    {
+        $validator = Validator::make($request->all(), [
+            'is_typing' => 'required|boolean',
+        ]);
+        
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        $discussion = Discussion::findOrFail($discussionId);
+        $user = Auth::user();
+        $isTyping = $request->is_typing;
+        
+        // Get user's full name
+        $userName = $user->prenom . ' ' . $user->nom;
+        
+        // Broadcast typing event
+        broadcast(new UserTypingEvent($discussionId, $user->id, $userName, $isTyping))->toOthers();
+        
+        return response()->json([
+            'success' => true,
+            'message' => $isTyping ? 'Typing indicator sent' : 'Typing indicator stopped'
         ]);
     }
 }

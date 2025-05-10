@@ -18,10 +18,12 @@ import {
 } from 'react-icons/fi';
 import zelijBackground from '../assets/zelijBack.png';
 import axios from 'axios';
+import { useAuth } from '../contexts/AuthContext';
 
 const CourseDetails = () => {
   const { courseId } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('overview');
   const [newForumTopic, setNewForumTopic] = useState('');
   const [newForumDescription, setNewForumDescription] = useState('');
@@ -107,13 +109,13 @@ const CourseDetails = () => {
                   let messageData = event.message || event;
                   
                   // If the message doesn't have user role info but we have the current user data
-                  if (messageData.user && !messageData.user.role && currentUser) {
+                  if (messageData.user && !messageData.user.role && user) {
                     // Add the current user's role to the message user data
                     messageData = {
                       ...messageData,
                       user: {
                         ...messageData.user,
-                        role: currentUser.role || userRole // Use available role information
+                        role: user.role || userRole // Use available role information
                       }
                     };
                   }

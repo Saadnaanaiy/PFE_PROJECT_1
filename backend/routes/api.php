@@ -47,7 +47,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete("/profile/delete", [UserController::class, "delete"]);
     Route::get("/instructors", [UserController::class, "getInstructors"]);
     Route::get("/instructors/{user}", [UserController::class, "show"]);
-    Route::get("/logout", [UserController::class, "logout"]);
+    Route::post("/logout", [UserController::class, "logout"]);
 
 
     // Forum route
@@ -64,6 +64,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/discussions/{discussionId}/messages', [MessageController::class, 'index']);
     Route::post('/discussions/{discussionId}/messages', [MessageController::class, 'store']);
+    Route::post('/discussions/{discussionId}/typing', [MessageController::class, 'typing']);
 
     Route::post('/checkout', [PaymentController::class, 'createCheckoutSession']);
 

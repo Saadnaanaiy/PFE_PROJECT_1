@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { CSSTransition, TransitionGroup } from 'react-transition-group';
 import { useParams } from 'react-router-dom';
 import PropTypes from 'prop-types';
 import axios from 'axios';
@@ -41,6 +42,67 @@ const moroccanColors = {
   gradient2: 'linear-gradient(135deg, #006233 0%, #227C9D 100%)',
 };
 
+// CSS for message animations and typing indicator
+const messageAnimationStyles = `
+  .message-enter {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  .message-enter-active {
+    opacity: 1;
+    transform: translateY(0);
+    transition: opacity 300ms, transform 300ms;
+  }
+  .message-exit {
+    opacity: 1;
+  }
+  .message-exit-active {
+    opacity: 0;
+    transition: opacity 300ms;
+  }
+  
+  /* WhatsApp-style typing indicator animation */
+  @keyframes typingBounce {
+    0%, 100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-8px);
+    }
+  }
+  
+  .typing-indicator {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 12px;
+    padding: 4px 8px;
+    background-color: rgba(255, 255, 255, 0.8);
+    border-radius: 12px;
+  }
+  
+  .typing-dot {
+    width: 10px;
+    height: 10px;
+    margin: 0 3px;
+    border-radius: 50%;
+    display: inline-block;
+    animation: typingBounce 0.8s infinite;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  }
+  
+  .typing-dot:nth-child(1) {
+    animation-delay: 0s;
+  }
+  
+  .typing-dot:nth-child(2) {
+    animation-delay: 0.2s;
+  }
+  
+  .typing-dot:nth-child(3) {
+    animation-delay: 0.4s;
+  }
+`;
+
 // Function to fix duplicate URL prefixes in image paths
 const fixImagePath = (imagePath) => {
   if (!imagePath) return '';
@@ -65,6 +127,9 @@ const CourseVideoView = ({ onBack }) => {
   const [newMessage, setNewMessage] = useState('');
   const [currentDiscussionId, setCurrentDiscussionId] = useState(null);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
+  const [usersTyping, setUsersTyping] = useState({});
+  const [isTyping, setIsTyping] = useState(false);
+  const typingTimeoutRef = useRef(null);
   const messagesEndRef = useRef(null);
   const [course, setCourse] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -145,11 +210,42 @@ const CourseVideoView = ({ onBack }) => {
       channel.listen('NewMessageEvent', (event) => {
         console.log('Received new message event:', event);
         setMessages(prevMessages => [...prevMessages, event.message || event]);
+        
+        // When a message is received, remove that user from typing list
+        if (event.message?.user?.id) {
+          setUsersTyping(prev => {
+            const updated = {...prev};
+            delete updated[event.message.user.id];
+            return updated;
+          });
+        }
+      });
+      
+      // Listen for typing events
+      channel.listen('UserTypingEvent', (event) => {
+        console.log('User typing event:', event);
+        const { user_id, user_name, is_typing } = event;
+        
+        if (is_typing) {
+          // Add user to typing list
+          setUsersTyping(prev => ({
+            ...prev,
+            [user_id]: { name: user_name, timestamp: new Date().getTime() }
+          }));
+        } else {
+          // Remove user from typing list
+          setUsersTyping(prev => {
+            const updated = {...prev};
+            delete updated[user_id];
+            return updated;
+          });
+        }
       });
 
       return () => {
         try {
           channel.stopListening('NewMessageEvent');
+          channel.stopListening('UserTypingEvent');
         } catch (error) {
           console.error('Error stopping Echo listener:', error);
         }
@@ -470,12 +566,74 @@ const CourseVideoView = ({ onBack }) => {
     }
   };
 
+  // Handle typing indicator
+  const handleTyping = () => {
+    if (!currentDiscussionId || !window.Echo || !currentUser) return;
+    
+    // Set local typing state
+    if (!isTyping) {
+      setIsTyping(true);
+      
+      // Broadcast that user is typing
+      try {
+        axios.post(`/api/discussions/${currentDiscussionId}/typing`, {
+          is_typing: true
+        });
+      } catch (error) {
+        console.error('Error sending typing indicator:', error);
+      }
+    }
+    
+    // Clear existing timeout
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+    
+    // Set new timeout to stop typing indicator after 2 seconds of inactivity
+    typingTimeoutRef.current = setTimeout(() => {
+      setIsTyping(false);
+      
+      // Broadcast that user stopped typing
+      try {
+        axios.post(`/api/discussions/${currentDiscussionId}/typing`, {
+          is_typing: false
+        });
+      } catch (error) {
+        console.error('Error sending typing indicator:', error);
+      }
+    }, 2000);
+  };
+  
+  // Clean up typing timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+    };
+  }, []);
+  
   // Send a new message
   const sendMessage = async (e) => {
     e.preventDefault();
     if (!newMessage.trim() || !currentDiscussionId) return;
 
     try {
+      // Clear typing indicator when sending message
+      setIsTyping(false);
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+      
+      // Broadcast that user stopped typing
+      try {
+        axios.post(`/api/discussions/${currentDiscussionId}/typing`, {
+          is_typing: false
+        });
+      } catch (error) {
+        console.error('Error sending typing indicator:', error);
+      }
+      
       const response = await axios.post(`/api/discussions/${currentDiscussionId}/messages`, {
         contenu: newMessage
       });
@@ -483,6 +641,7 @@ const CourseVideoView = ({ onBack }) => {
       // If Echo isn't working, manually add the message to the UI
       if (!window.Echo) {
         const newMsg = response.data.data;
+        // Add message with animation
         setMessages(prevMessages => [...prevMessages, newMsg]);
       }
       
@@ -491,6 +650,20 @@ const CourseVideoView = ({ onBack }) => {
       console.error('Error sending message:', error);
     }
   };
+
+  // Scroll to bottom of messages container when messages change
+  useEffect(() => {
+    if (messagesEndRef.current && messages.length > 0) {
+      // Find the messages container by its ID instead of parent references
+      const messagesContainer = document.getElementById('messages-container');
+      if (messagesContainer) {
+        // Use scrollIntoView with behavior: 'auto' and block: 'end' to prevent page scrolling
+        messagesEndRef.current.scrollIntoView({ behavior: 'auto', block: 'end', inline: 'nearest' });
+        // Prevent the page from scrolling
+        window.scrollTo(window.scrollX, window.scrollY);
+      }
+    }
+  }, [messages]);
 
   // Format date for messages
   const formatMessageDate = (dateString) => {
@@ -851,82 +1024,7 @@ const CourseVideoView = ({ onBack }) => {
                       instruction to master these concepts.
                     </p>
 
-                    <div className="bg-neutral-50 p-5 rounded-lg border border-neutral-200 relative overflow-hidden">
-                      {/* Moroccan decorative corner */}
-                      <div className="absolute top-0 right-0 w-12 h-12">
-                        <svg
-                          viewBox="0 0 100 100"
-                          xmlns="http://www.w3.org/2000/svg"
-                        >
-                          <path
-                            d="M0 0 L100 0 L100 100 Z"
-                            fill={`${moroccanColors.tertiary}15`}
-                          />
-                          <path
-                            d="M20 0 L100 0 L100 80 Z"
-                            fill={`${moroccanColors.primary}10`}
-                          />
-                          <path
-                            d="M40 0 L100 0 L100 60 Z"
-                            fill={`${moroccanColors.secondary}05`}
-                          />
-                        </svg>
-                      </div>
-
-                      <h3 className="font-medium text-lg mb-3 flex items-center">
-                        <FiFile
-                          className="mr-2"
-                          style={{ color: moroccanColors.primary }}
-                        />
-                        Additional Resources
-                      </h3>
-                      <ul className="space-y-3">
-                        <li className="flex items-center transition-colors hover:text-primary-dark">
-                          <div
-                            className="w-8 h-8 rounded-md flex items-center justify-center mr-3"
-                            style={{
-                              backgroundColor: `${moroccanColors.primary}15`,
-                            }}
-                          >
-                            <FiFileText
-                              style={{ color: moroccanColors.primary }}
-                            />
-                          </div>
-                          <a
-                            href="#"
-                            className="flex-1 hover:underline"
-                            style={{ color: moroccanColors.primary }}
-                          >
-                            Lesson slides (PDF)
-                          </a>
-                          <span className="text-xs text-neutral-500">
-                            1.2 MB
-                          </span>
-                        </li>
-                        <li className="flex items-center transition-colors hover:text-primary-dark">
-                          <div
-                            className="w-8 h-8 rounded-md flex items-center justify-center mr-3"
-                            style={{
-                              backgroundColor: `${moroccanColors.secondary}15`,
-                            }}
-                          >
-                            <FiDownload
-                              style={{ color: moroccanColors.secondary }}
-                            />
-                          </div>
-                          <a
-                            href="#"
-                            className="flex-1 hover:underline"
-                            style={{ color: moroccanColors.secondary }}
-                          >
-                            Exercise files
-                          </a>
-                          <span className="text-xs text-neutral-500">
-                            4.5 MB
-                          </span>
-                        </li>
-                      </ul>
-                    </div>
+                   
                   </div>
 
                   <div className="flex items-center justify-between bg-white rounded-xl p-4 border border-neutral-200 shadow-sm">
@@ -1066,13 +1164,7 @@ const CourseVideoView = ({ onBack }) => {
                               ))
                             )}
                           </select>
-                          <button
-                            className="px-4 py-2 text-white rounded-md hover:shadow-md flex items-center transition-all"
-                            style={{ background: moroccanStyles.buttonGradient }}
-                          >
-                            <FiMessageSquare className="mr-2" />
-                            New Discussion
-                          </button>
+                          
                         </div>
                       ) : (
                         <button
@@ -1087,8 +1179,8 @@ const CourseVideoView = ({ onBack }) => {
 
                     {currentDiscussionId ? (
                       <div className="bg-white rounded-lg border border-neutral-200 overflow-hidden">
-                        {/* Messages container */}
-                        <div className="h-96 overflow-y-auto p-4 bg-neutral-50">
+                        {/* Messages container - fixed height with overflow for scrolling */}
+                        <div className="h-96 overflow-y-auto p-4 bg-neutral-50" id="messages-container">
                           {isLoadingMessages ? (
                             <div className="flex justify-center items-center h-full">
                               <div 
@@ -1098,23 +1190,30 @@ const CourseVideoView = ({ onBack }) => {
                             </div>
                           ) : messages.length > 0 ? (
                             <div className="space-y-4">
-                               {messages.map((message, index) => {
-                                // Get the current user ID from state, localStorage, or course data
-                                // This determines if the message appears on the right or left
-                                const currentUserId = currentUser?.id || localStorage.getItem('user_id') || (course?.user_id || 0);
-                                const isCurrentUser = message.user?.id === parseInt(currentUserId);
-                                
-                                // Log message data for debugging
-                                console.log('Message data:', message);
-                                console.log('Current user ID:', currentUserId);
-                                console.log('Message user ID:', message.user?.id);
-                                console.log('Is current user:', isCurrentUser);
-                                
-                                return (
-                                  <div 
-                                    key={message.id || index} 
-                                    className="mb-4"
-                                  >
+                               {/* Add style tag for animations */}
+                               <style>{messageAnimationStyles}</style>
+                               
+                               {/* Use TransitionGroup for animating messages */}
+                               <TransitionGroup component={null}>
+                                 {messages.map((message, index) => {
+                                   // Get the current user ID from state, localStorage, or course data
+                                   // This determines if the message appears on the right or left
+                                   const currentUserId = currentUser?.id || localStorage.getItem('user_id') || (course?.user_id || 0);
+                                   const isCurrentUser = message.user?.id === parseInt(currentUserId);
+                                   
+                                   // Log message data for debugging
+                                   console.log('Message data:', message);
+                                   console.log('Current user ID:', currentUserId);
+                                   console.log('Message user ID:', message.user?.id);
+                                   console.log('Is current user:', isCurrentUser);
+                                   
+                                   return (
+                                     <CSSTransition
+                                       key={message.id || index}
+                                       timeout={300}
+                                       classNames="message"
+                                     >
+                                       <div className="mb-4">
                                     {/* Message bubble with user info */}
                                     <div className={`flex items-start ${isCurrentUser ? 'justify-end' : 'justify-start'}`}>
                                       
@@ -1166,10 +1265,12 @@ const CourseVideoView = ({ onBack }) => {
                                       
                                       
                                     </div>
-                                  </div>
-                                );
-                              })}
-                              <div ref={messagesEndRef} />
+                                     </div>
+                                   </CSSTransition>
+                                 );
+                               })}
+                               </TransitionGroup>
+                               <div ref={messagesEndRef} />
                             </div>
                           ) : (
                             <div className="flex flex-col items-center justify-center h-full">
@@ -1195,14 +1296,59 @@ const CourseVideoView = ({ onBack }) => {
                         {/* Message input form */}
                         <form onSubmit={sendMessage} className="p-3 border-t border-neutral-200 bg-white">
                           <div className="flex items-center">
-                            <input
-                              type="text"
-                              value={newMessage}
-                              onChange={(e) => setNewMessage(e.target.value)}
-                              placeholder="Type your message here..."
-                              className="flex-1 p-2 border border-neutral-300 rounded-l-md focus:outline-none"
-                              style={{ borderColor: `${moroccanColors.accent1}40` }}
-                            />
+                              <div className="flex-1 relative">
+                                <input
+                                  type="text"
+                                  value={newMessage}
+                                  onChange={(e) => setNewMessage(e.target.value)}
+                                  onKeyDown={handleTyping}
+                                  placeholder="Type your message here..."
+                                  className="w-full p-2 border border-neutral-300 rounded-l-md focus:outline-none"
+                                  style={{ borderColor: `${moroccanColors.accent1}40` }}
+                                />
+                                {/* Display typing indicator */}
+                                {Object.keys(usersTyping).length > 0 && (
+                                  <div className="absolute -top-10 left-0 text-sm font-medium text-neutral-600 bg-white/90 px-3 py-2 rounded-lg shadow-md">
+                                    {Object.values(usersTyping).length === 1 ? (
+                                      <div className="flex items-center">
+                                        <span>{Object.values(usersTyping)[0].name} is typing</span>
+                                        <div className="typing-indicator ml-2">
+                                          <div 
+                                            className="typing-dot" 
+                                            style={{ backgroundColor: moroccanColors.primary }}
+                                          ></div>
+                                          <div 
+                                            className="typing-dot" 
+                                            style={{ backgroundColor: moroccanColors.secondary }}
+                                          ></div>
+                                          <div 
+                                            className="typing-dot" 
+                                            style={{ backgroundColor: moroccanColors.tertiary }}
+                                          ></div>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <div className="flex items-center">
+                                        <span>{Object.values(usersTyping).length} people are typing</span>
+                                        <div className="typing-indicator ml-2">
+                                          <div 
+                                            className="typing-dot" 
+                                            style={{ backgroundColor: moroccanColors.primary }}
+                                          ></div>
+                                          <div 
+                                            className="typing-dot" 
+                                            style={{ backgroundColor: moroccanColors.secondary }}
+                                          ></div>
+                                          <div 
+                                            className="typing-dot" 
+                                            style={{ backgroundColor: moroccanColors.tertiary }}
+                                          ></div>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
                             <button
                               type="submit"
                               className="px-4 py-2 rounded-r-md text-white"

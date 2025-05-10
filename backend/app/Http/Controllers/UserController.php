@@ -437,4 +437,7 @@ public function show($id)
             'message' => 'Utilisateur supprimé avec succès'
         ]);
     }
+
+    
 }
+

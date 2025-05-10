@@ -14,6 +14,10 @@ export default function DashboardStats({ dashboardData }) {
     byStatus: [],
     byMonth: [],
   });
+  const [communicationStats, setCommunicationStats] = useState({
+    messages: { byDate: [] },
+    discussions: { byForum: [] }
+  });
 
   // Refs for chart canvases
   const coursesChartRef = useRef(null);
@@ -21,6 +25,7 @@ export default function DashboardStats({ dashboardData }) {
   const durationChartRef = useRef(null);
   const growthChartRef = useRef(null);
   const transactionChartRef = useRef(null);
+  const messagesChartRef = useRef(null);
 
   // Refs to store chart instances
   const coursesChartInstance = useRef(null);
@@ -28,6 +33,7 @@ export default function DashboardStats({ dashboardData }) {
   const durationChartInstance = useRef(null);
   const growthChartInstance = useRef(null);
   const transactionChartInstance = useRef(null);
+  const messagesChartInstance = useRef(null);
 
   // Colors for charts
   const COLORS = [
@@ -358,17 +364,19 @@ export default function DashboardStats({ dashboardData }) {
         priceChartInstance,
         durationChartInstance,
         transactionChartInstance,
+        messagesChartInstance,
       ].forEach((ref) => {
         if (ref.current) ref.current.destroy();
       });
     };
-  }, [
-    userCounts,
-    coursesByLevel,
-    coursesByPrice,
-    coursesByDuration,
-    transactionStats,
-  ]);
+}, [
+  userCounts,
+  coursesByLevel,
+  coursesByPrice,
+  coursesByDuration,
+  transactionStats,
+  communicationStats,
+]);
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-12 gap-6 mb-8">
