@@ -74,8 +74,11 @@ class PanierController extends Controller
         $panier->cours()->attach($cours->id, [
             'prix' => $cours->prix,
         ]);
+        
+        // Get the updated cart count
+        $cartCount = $panier->cours()->count();
 
-        return response()->json(['message' => 'Added to cart'], 201);
+        return response()->json(['message' => 'Added to cart', 'cartCount' => $cartCount], 201);
     }
 
     /**
@@ -89,8 +92,11 @@ class PanierController extends Controller
                         ->firstOrFail();
 
         $panier->cours()->detach($coursId);
+        
+        // Get the updated cart count
+        $cartCount = $panier->cours()->count();
 
-        return response()->json(['message' => 'Removed from cart']);
+        return response()->json(['message' => 'Removed from cart', 'cartCount' => $cartCount]);
     }
 
     /**
@@ -105,7 +111,7 @@ class PanierController extends Controller
 
         $panier->cours()->detach();
 
-        return response()->json(['message' => 'Cart cleared']);
+        return response()->json(['message' => 'Cart cleared', 'cartCount' => 0]);
     }
 
     /**

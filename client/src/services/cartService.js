@@ -51,7 +51,7 @@ export const addToCart = async (courseId) => {
         headers: { Authorization: `Bearer ${token}` },
       },
     );
-
+    
     return response.data;
   } catch (error) {
     console.error('Error adding to cart:', error);
@@ -75,7 +75,7 @@ export const removeFromCart = async (courseId) => {
     const response = await axios.delete(`${BASE_URL}/${courseId}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
-
+    
     return response.data;
   } catch (error) {
     console.error('Error removing from cart:', error);
@@ -98,7 +98,7 @@ export const clearCart = async () => {
     const response = await axios.delete(BASE_URL, {
       headers: { Authorization: `Bearer ${token}` },
     });
-
+    
     return response.data;
   } catch (error) {
     console.error('Error clearing cart:', error);

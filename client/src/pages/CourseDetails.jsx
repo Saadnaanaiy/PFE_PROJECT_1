@@ -846,7 +846,7 @@ const CourseDetails = () => {
                                     className="flex items-center px-4 py-2 bg-gradient-to-r from-primary to-secondary text-white rounded-md hover:shadow-md transition-all"
                                   >
                                     <FiPlus className="mr-2" />
-                                    New Discussion
+                                    New Room
                                   </button>
                                 )}
                               </div>
@@ -882,27 +882,27 @@ const CourseDetails = () => {
                                 <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-xl border border-blue-100 mb-6 shadow-sm">
                                   <h4 className="font-semibold text-lg mb-4 flex items-center text-indigo-800">
                                     <FiPlus className="mr-2" />
-                                    Create New Discussion
+                                    Create New Room
                                   </h4>
                                   
                                   <div className="space-y-4">
                                     <div>
                                       <label htmlFor="discussion-title" className="block text-sm font-medium text-gray-700 mb-1">
-                                        Discussion Title *
+                                        Room Title *
                                       </label>
                                       <input
                                         id="discussion-title"
                                         type="text"
                                         value={newDiscussionTitle}
                                         onChange={(e) => setNewDiscussionTitle(e.target.value)}
-                                        placeholder="Enter a clear, specific title for your discussion"
+                                        placeholder="Enter a clear, specific title for your Room"
                                         className="w-full p-3 border border-blue-200 rounded-md focus:ring-2 focus:ring-primary focus:border-primary transition-all"
                                       />
                                     </div>
                                     
                                     <div>
                                       <label htmlFor="discussion-content" className="block text-sm font-medium text-gray-700 mb-1">
-                                        Discussion Content *
+                                        Room Content *
                                       </label>
                                       <textarea
                                         id="discussion-content"
@@ -930,7 +930,7 @@ const CourseDetails = () => {
                                         disabled={!newDiscussionTitle.trim() || !newDiscussionContent.trim()}
                                         className="px-5 py-2 bg-gradient-to-r from-primary to-secondary text-white rounded-md hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                                       >
-                                        Create Discussion
+                                        Create Room
                                       </button>
                                     </div>
                                   </div>
@@ -948,7 +948,7 @@ const CourseDetails = () => {
                                           <path d="M2 5a2 2 0 012-2h7a2 2 0 012 2v4a2 2 0 01-2 2H9l-3 3v-3H4a2 2 0 01-2-2V5z" />
                                           <path d="M15 7v2a4 4 0 01-4 4H9.828l-1.766 1.767c.28.149.599.233.938.233h2l3 3v-3h2a2 2 0 002-2V9a2 2 0 00-2-2h-1z" />
                                         </svg>
-                                        Discussions
+                                        Rooms
                                       </h4>
                                       <div className="bg-white rounded-xl overflow-hidden shadow-sm border border-neutral-200">
                                         {getActiveForum().discussions.map((discussion) => (
@@ -1054,8 +1054,8 @@ const CourseDetails = () => {
                                           <div className="w-16 h-16 bg-neutral-100 rounded-full flex items-center justify-center mx-auto mb-3">
                                             <FiMessageSquare className="text-2xl text-neutral-400" />
                                           </div>
-                                          <h4 className="font-medium text-neutral-600 mb-1">Select a Discussion</h4>
-                                          <p className="text-neutral-500 text-sm">Choose a discussion from the list to view messages</p>
+                                          <h4 className="font-medium text-neutral-600 mb-1">Select a Room</h4>
+                                          <p className="text-neutral-500 text-sm">Choose a room from the list to view messages</p>
                                         </div>
                                       )}
                                     </div>
@@ -1065,15 +1065,15 @@ const CourseDetails = () => {
                                     <div className="w-16 h-16 bg-neutral-100 rounded-full flex items-center justify-center mx-auto mb-3">
                                       <FiMessageSquare className="text-2xl text-neutral-400" />
                                     </div>
-                                    <h4 className="font-medium text-neutral-600 mb-1">No Discussions Yet</h4>
-                                    <p className="text-neutral-500 text-sm mb-4">Be the first to start a discussion in this forum!</p>
+                                    <h4 className="font-medium text-neutral-600 mb-1">No Rooms Yet</h4>
+                                    <p className="text-neutral-500 text-sm mb-4">Be the first to start a room in this forum!</p>
                                     {userRole === 'instructeur' && (
                                       <button
                                         onClick={() => setShowNewDiscussionForm(true)}
                                         className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-dark transition-colors inline-flex items-center"
                                       >
                                         <FiPlus className="mr-2" />
-                                        Create Discussion
+                                        Create Room
                                       </button>
                                     )}
                                   </div>
@@ -1110,7 +1110,7 @@ const CourseDetails = () => {
                               {!userRole && (
                                 <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-md text-yellow-700">
                                   <p>
-                                    Please log in to view discussions.
+                                    Please log in to view rooms.
                                   </p>
                                 </div>
                               )}
@@ -1118,7 +1118,7 @@ const CourseDetails = () => {
                               {userRole === 'etudiant' && (
                                 <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-md text-blue-700">
                                   <p>
-                                    Only instructors can add discussions in this forum.
+                                    Only instructors can add rooms in this forum.
                                   </p>
                                 </div>
                               )}
@@ -1155,7 +1155,7 @@ const CourseDetails = () => {
                                   }}
                                   className="text-primary hover:text-primary-dark flex items-center"
                                 >
-                                  View Discussions
+                                  View Rooms
                                 </button>
                               </div>
                             </div>

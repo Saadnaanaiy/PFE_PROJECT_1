@@ -625,6 +625,15 @@ const CourseVideoView = ({ onBack }) => {
         clearTimeout(typingTimeoutRef.current);
       }
       
+      // Also immediately clear this user from the usersTyping object to prevent showing indicator
+      if (currentUser && currentUser.id) {
+        setUsersTyping(prev => {
+          const newState = {...prev};
+          delete newState[currentUser.id];
+          return newState;
+        });
+      }
+      
       // Broadcast that user stopped typing
       try {
         axios.post(`/api/discussions/${currentDiscussionId}/typing`, {
@@ -1145,7 +1154,7 @@ const CourseVideoView = ({ onBack }) => {
                           className="mr-2"
                           style={{ color: moroccanColors.accent1 }}
                         />
-                        Lesson Discussion
+                        Lesson Room
                       </h3>
                       
                       {course?.forums && course.forums.length > 0 ? (
@@ -1155,7 +1164,7 @@ const CourseVideoView = ({ onBack }) => {
                             onChange={(e) => fetchMessages(e.target.value)}
                             style={{ borderColor: `${moroccanColors.accent1}40` }}
                           >
-                            <option value="">Select a discussion</option>
+                            <option value="">Select a room</option>
                             {course.forums.flatMap(forum => 
                               forum.discussions.map(discussion => (
                                 <option key={discussion.id} value={discussion.id}>
@@ -1172,7 +1181,7 @@ const CourseVideoView = ({ onBack }) => {
                           style={{ background: moroccanStyles.buttonGradient }}
                         >
                           <FiMessageSquare className="mr-2" />
-                          Start a Discussion
+                          Start a Room
                         </button>
                       )}
                     </div>
@@ -1306,8 +1315,8 @@ const CourseVideoView = ({ onBack }) => {
                                   className="w-full p-2 border border-neutral-300 rounded-l-md focus:outline-none"
                                   style={{ borderColor: `${moroccanColors.accent1}40` }}
                                 />
-                                {/* Display typing indicator */}
-                                {Object.keys(usersTyping).length > 0 && (
+                                {/* Display typing indicator - only shown to users who aren't typing themselves */}
+                                {Object.keys(usersTyping).length > 0 && !isTyping && (
                                   <div className="absolute -top-10 left-0 text-sm font-medium text-neutral-600 bg-white/90 px-3 py-2 rounded-lg shadow-md">
                                     {Object.values(usersTyping).length === 1 ? (
                                       <div className="flex items-center">
@@ -1389,14 +1398,14 @@ const CourseVideoView = ({ onBack }) => {
                             />
                           </div>
                           <h4 className="font-medium text-lg text-neutral-700 mb-2">
-                            Select a Discussion
+                            Select a Room
                           </h4>
                           <p className="text-neutral-600 mb-1">
-                            Please select a discussion from the dropdown above to view and send messages.
+                            Please select a room from the dropdown above to view and send messages.
                           </p>
                           {(!course?.forums || course.forums.length === 0) && (
                             <p className="text-sm text-neutral-500">
-                              No discussions available for this course yet.
+                              No rooms available for this course yet.
                             </p>
                           )}
                         </div>

@@ -540,4 +540,85 @@ class CoursController extends Controller
             'data' => $discussion
         ]);
     }
+    
+    /**
+     * Search for courses by query string
+     *
+     * @param string $query
+     * @return \Illuminate\Http\Response
+     */
+    public function search($query)
+    {
+        $courses = Cours::with(['instructeur.user' => function($q) {
+            $q->select('id', 'nom', 'email', 'image');
+        }, 'categorie'])
+        ->where(function ($q) use ($query) {
+            $q->where('titre', 'like', "%{$query}%")
+              ->orWhere('description', 'like', "%{$query}%")
+              ->orWhere('niveau', 'like', "%{$query}%")
+              ->orWhereHas('categorie', function($q) use ($query) {
+                  $q->where('nom', 'like', "%{$query}%");
+              })
+              ->orWhereHas('instructeur.user', function($q) use ($query) {
+                  $q->where('nom', 'like', "%{$query}%");
+              });
+        })
+        ->get();
+        
+        // Transform course images
+        $courses->transform(function ($course) {
+            return $this->transformCourseImages($course);
+        });
+        
+        return response()->json([
+            'status' => 'success',
+            'data' => $courses
+        ]);
+    }
+    
+    /**
+     * Get all courses by a specific instructor
+     *
+     * @param int $id Instructor ID
+     * @return \Illuminate\Http\Response
+     */
+    public function getInstructorCourses($id)
+    {
+        // Find the instructor
+        $instructeur = \App\Models\Instructeur::where('user_id', $id)->first();
+        
+        if (!$instructeur) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Instructeur non trouvé'
+            ], 404);
+        }
+        
+        // Get all courses by this instructor
+        $courses = Cours::with(['categorie'])
+            ->where('instructeur_id', $instructeur->id)
+            ->get();
+        
+        // Transform course images
+        $courses->transform(function ($course) {
+            return $this->transformCourseImages($course);
+        });
+        
+        // Get instructor details
+        $instructeur->load('user');
+        
+        // Format instructor image
+        if ($instructeur->image) {
+            $instructeur->image = $this->formatAssetUrl($instructeur->image);
+        }
+        
+        return response()->json([
+            'status' => 'success',
+            'data' => [
+                'instructor' => $instructeur,
+                'courses' => $courses,
+                'total_courses' => $courses->count()
+            ]
+        ]);
+    }
 }

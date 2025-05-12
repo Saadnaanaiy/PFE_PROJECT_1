@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   FiSearch,
@@ -22,6 +22,12 @@ const Header = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [cartItemsCount, setCartItemsCount] = useState(0);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [showSearchResults, setShowSearchResults] = useState(false);
+  const searchResultsRef = useRef(null);
+  const searchInputRef = useRef(null);
   const [localAuthState, setLocalAuthState] = useState({
     isAuthenticated: false,
     userData: null,
@@ -150,13 +156,27 @@ const Header = () => {
     const handleCartUpdated = () => {
       fetchCartCount();
     };
+    
+    // Click outside handler for search results
+    const handleClickOutside = (event) => {
+      if (
+        searchResultsRef.current && 
+        !searchResultsRef.current.contains(event.target) &&
+        searchInputRef.current &&
+        !searchInputRef.current.contains(event.target)
+      ) {
+        setShowSearchResults(false);
+      }
+    };
 
-    // Add event listener
+    // Add event listeners
     window.addEventListener('cartUpdated', handleCartUpdated);
+    document.addEventListener('mousedown', handleClickOutside);
 
-    // Clean up the event listener
+    // Clean up the event listeners
     return () => {
       window.removeEventListener('cartUpdated', handleCartUpdated);
+      document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [localAuthState.isAuthenticated, localAuthState.userRole]);
 
@@ -201,6 +221,39 @@ const Header = () => {
       return 'Student';
     }
   };
+  
+  // Handle search input change
+  const handleSearchChange = (e) => {
+    setSearchQuery(e.target.value);
+    if (e.target.value.trim() === '') {
+      setSearchResults([]);
+      setShowSearchResults(false);
+    }
+  };
+  
+  // Handle search submission
+  const handleSearchSubmit = async (e) => {
+    e.preventDefault();
+    if (searchQuery.trim() === '') return;
+    
+    try {
+      setIsSearching(true);
+      const response = await axios.get(`http://localhost:8000/api/courses/search/${encodeURIComponent(searchQuery)}`);
+      setSearchResults(response.data.data);
+      setShowSearchResults(true);
+      setIsSearching(false);
+    } catch (error) {
+      console.error('Error searching courses:', error);
+      setIsSearching(false);
+    }
+  };
+  
+  // Navigate to course details
+  const navigateToCourse = (courseId) => {
+    setShowSearchResults(false);
+    setSearchQuery('');
+    navigate(`/courses/${courseId}`);
+  };
 
   // If still loading auth state, show a simple loading state
   if (localAuthState.isLoading) {
@@ -234,12 +287,64 @@ const Header = () => {
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-8">
             <div className="relative">
-              <input
-                type="text"
-                placeholder="Search for courses..."
-                className="pl-10 pr-4 py-2 w-64 rounded-full border border-neutral-300 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-              />
-              <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-neutral-500" />
+              <form onSubmit={handleSearchSubmit} className="relative">
+                <input
+                  type="text"
+                  placeholder="Search for courses..."
+                  className="pl-10 pr-4 py-2 w-64 rounded-full border border-neutral-300 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                  value={searchQuery}
+                  onChange={handleSearchChange}
+                  ref={searchInputRef}
+                />
+                <button
+                  type="submit"
+                  className="absolute left-3 top-1/2 transform -translate-y-1/2 text-neutral-500"
+                >
+                  <FiSearch className="w-5 h-5" />
+                </button>
+              </form>
+              
+              {/* Search Results Dropdown */}
+              {showSearchResults && searchResults.length > 0 && (
+                <div 
+                  ref={searchResultsRef}
+                  className="absolute z-50 w-full mt-2 bg-white rounded-lg shadow-lg max-h-96 overflow-y-auto"
+                >
+                  <div className="p-2">
+                    <h3 className="text-sm font-semibold text-gray-700 mb-2">Search Results</h3>
+                    {searchResults.map((course) => (
+                      <div 
+                        key={course.id} 
+                        className="flex items-center p-2 hover:bg-gray-100 rounded-md cursor-pointer"
+                        onClick={() => navigateToCourse(course.id)}
+                      >
+                        {course.image && (
+                          <img 
+                            src={course.image} 
+                            alt={course.titre} 
+                            className="w-12 h-12 object-cover rounded-md mr-3"
+                          />
+                        )}
+                        <div>
+                          <h4 className="font-medium text-sm">{course.titre}</h4>
+                          <p className="text-xs text-gray-600 truncate">
+                            {course.instructeur?.user?.nom || 'Unknown Instructor'}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {showSearchResults && searchResults.length === 0 && searchQuery.trim() !== '' && !isSearching && (
+                <div 
+                  ref={searchResultsRef}
+                  className="absolute z-50 w-full mt-2 bg-white rounded-lg shadow-lg p-4"
+                >
+                  <p className="text-sm text-gray-600">No courses found matching "{searchQuery}"</p>
+                </div>
+              )}
             </div>
 
             <div className="flex items-center space-x-6">
@@ -390,20 +495,91 @@ const Header = () => {
                   )}
                 </Link>
               )}
-            <button
-              onClick={() => setIsOpen(!isOpen)}
-              className="text-neutral-800"
-              aria-label="Toggle menu"
-            >
-              {isOpen ? (
-                <FiX className="w-6 h-6" />
-              ) : (
-                <FiMenu className="w-6 h-6" />
-              )}
-            </button>
+            <div className="md:hidden flex items-center space-x-2">
+              <button
+                onClick={() => {
+                  const mobileSearchForm = document.getElementById('mobile-search-form');
+                  if (mobileSearchForm) {
+                    mobileSearchForm.classList.toggle('hidden');
+                    if (!mobileSearchForm.classList.contains('hidden')) {
+                      mobileSearchForm.querySelector('input').focus();
+                    }
+                  }
+                }}
+                className="text-neutral-800 p-2"
+              >
+                <FiSearch className="w-6 h-6" />
+              </button>
+              <button
+                onClick={() => setIsOpen(!isOpen)}
+                className="text-neutral-800"
+                aria-label="Toggle menu"
+              >
+                {isOpen ? (
+                  <FiX className="w-6 h-6" />
+                ) : (
+                  <FiMenu className="w-6 h-6" />
+                )}
+              </button>
+            </div>
           </div>
         </div>
 
+        {/* Mobile Search Form */}
+        <div id="mobile-search-form" className="hidden w-full px-4 py-2 bg-white border-b border-gray-200">
+          <form onSubmit={handleSearchSubmit} className="relative">
+            <input
+              type="text"
+              placeholder="Search for courses..."
+              className="w-full py-2 pl-10 pr-4 text-sm bg-gray-100 border border-transparent rounded-lg focus:outline-none focus:bg-white focus:border-primary"
+              value={searchQuery}
+              onChange={handleSearchChange}
+            />
+            <button
+              type="submit"
+              className="absolute inset-y-0 left-0 flex items-center pl-3"
+            >
+              <FiSearch className="w-5 h-5 text-gray-500" />
+            </button>
+          </form>
+          
+          {/* Mobile Search Results */}
+          {showSearchResults && searchResults.length > 0 && (
+            <div className="mt-2 bg-white rounded-lg shadow-lg max-h-96 overflow-y-auto">
+              <div className="p-2">
+                <h3 className="text-sm font-semibold text-gray-700 mb-2">Search Results</h3>
+                {searchResults.map((course) => (
+                  <div 
+                    key={course.id} 
+                    className="flex items-center p-2 hover:bg-gray-100 rounded-md cursor-pointer"
+                    onClick={() => navigateToCourse(course.id)}
+                  >
+                    {course.image && (
+                      <img 
+                        src={course.image} 
+                        alt={course.titre} 
+                        className="w-12 h-12 object-cover rounded-md mr-3"
+                      />
+                    )}
+                    <div>
+                      <h4 className="font-medium text-sm">{course.titre}</h4>
+                      <p className="text-xs text-gray-600 truncate">
+                        {course.instructeur?.user?.nom || 'Unknown Instructor'}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {showSearchResults && searchResults.length === 0 && searchQuery.trim() !== '' && !isSearching && (
+            <div className="mt-2 bg-white rounded-lg shadow-lg p-4">
+              <p className="text-sm text-gray-600">No courses found matching "{searchQuery}"</p>
+            </div>
+          )}
+        </div>
+        
         {/* Mobile Navigation */}
         {isOpen && (
           <div className="md:hidden mt-4 animate-fadeIn">

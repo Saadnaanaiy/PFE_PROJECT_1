@@ -5,6 +5,7 @@ use App\Http\Controllers\CategorieController;
 use App\Http\Controllers\CoursController;
 use App\Http\Controllers\InstructorCourseController;
 use App\Http\Controllers\InstructorLessonController;
+use Illuminate\Support\Facades\Broadcast;
 use App\Http\Controllers\MessageController;
 use App\Http\Controllers\PanierController;
 use App\Http\Controllers\PaymentController;
@@ -19,6 +20,7 @@ Route::post("/login", [UserController::class, "login"])->name("login");
 
 // Public course routes
 Route::get('/courses', [CoursController::class, 'index']);
+Route::get('/courses/search/{query}', [CoursController::class, 'search']);
 Route::get('/courses/{id}', [CoursController::class, 'show']);
 Route::match(['put','patch'], 'courses/{course}', [CoursController::class, 'updateProgress']);
 Route::get('/categories', [CoursController::class, 'getCategories']);
@@ -122,3 +124,4 @@ Route::middleware(['auth:sanctum'])->prefix('admin')->group(function () {
     Route::put("/instructors/{id}/update", [AdminController::class, 'updateInstructor']);
     Route::delete("/instructors/{id}/delete", [AdminController::class, 'deleteInstructor']);
 });
+

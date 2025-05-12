@@ -89,12 +89,10 @@ const Cart = () => {
     }
   };
 
-  const subtotal = cartItems.reduce(
+  const total = cartItems.reduce(
     (total, item) => total + item.price * item.quantity,
     0,
   );
-  const tax = subtotal * 0.2;
-  const total = subtotal + tax;
 
   if (loading) return <p className="text-center py-10">Loading cart...</p>;
   if (error) return <p className="text-red-500 text-center py-10">{error}</p>;
@@ -180,16 +178,6 @@ const Cart = () => {
                   Order Summary
                 </h2>
                 <div className="space-y-4 text-neutral-600 mb-8">
-                  <div className="flex justify-between">
-                    <span>Subtotal</span>
-                    <span className="font-medium text-neutral-800">
-                      {subtotal.toFixed(2)} MAD
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>VAT (20%)</span>
-                    <span>{tax.toFixed(2)} MAD</span>
-                  </div>
                   <div className="h-px bg-neutral-200 my-3"></div>
                   <div className="flex justify-between font-bold text-lg">
                     <span>Total</span>
