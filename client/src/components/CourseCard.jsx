@@ -39,13 +39,13 @@ const AuthModal = ({ isOpen, onClose, onConfirm }) => {
         <div className="flex justify-end gap-3">
           <button
             onClick={onClose}
-            className="px-4 py-2 border border-neutral-300 rounded-md hover:bg-neutral-100"
+            className="certification-button"
           >
             Cancel
           </button>
           <button
             onClick={onConfirm}
-            className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-dark"
+            className="btn-primary hover:shadow-[-6px_0px_12px_rgba(0,98,51,0.6)]"
           >
             Log In
           </button>
@@ -117,7 +117,7 @@ const CourseCard = ({ course }) => {
           />
           <div className="absolute bottom-3 left-3">
             {course.categorie && (
-              <span className="px-3 py-1 bg-white/80 backdrop-blur-sm rounded-full text-sm font-medium text-neutral-800">
+              <span className="px-3 py-1 bg-green-500 bg-opacity-80 text-white backdrop-blur-sm rounded-full text-sm font-medium text-neutral-800">
                 {course.categorie.nom}
               </span>
             )}

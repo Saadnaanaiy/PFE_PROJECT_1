@@ -195,9 +195,7 @@ const CategorieDetaille = () => {
                       <div className="absolute top-3 left-3 bg-green-600 text-white text-xs font-semibold uppercase px-2 py-1 rounded">
                         {category.nom}
                       </div>
-                      <div className="absolute top-3 right-3 bg-white p-2 rounded-full shadow-md">
-                        <ShoppingCartIcon className="w-5 h-5 text-primary" />
-                      </div>
+                      
                     </div>
 
                     {/* Info Section */}

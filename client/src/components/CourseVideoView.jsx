@@ -135,6 +135,7 @@ const CourseVideoView = ({ onBack }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const videoPlayerRef = useRef(null);
 
   // Get current user information
   const [currentUser, setCurrentUser] = useState(null);
@@ -392,6 +393,18 @@ const CourseVideoView = ({ onBack }) => {
     const activeLesson = activeSection?.lessons?.[activeLessonIndex];
     return activeLesson?.videoUrl || '';
   };
+  
+  // Auto-play video when the active lesson changes
+  useEffect(() => {
+    // Small delay to ensure the video player has loaded the new source
+    const autoplayTimer = setTimeout(() => {
+      if (videoPlayerRef.current) {
+        videoPlayerRef.current.play();
+      }
+    }, 500);
+    
+    return () => clearTimeout(autoplayTimer);
+  }, [activeSectionIndex, activeLessonIndex]);
 
   const getActiveLesson = () => {
     if (
@@ -458,10 +471,17 @@ const CourseVideoView = ({ onBack }) => {
     }
 
     // Automatically advance to next lesson if available
+    advanceToNextLesson();
+  };
+  
+  // Function to advance to the next lesson with autoplay
+  const advanceToNextLesson = () => {
     const currentSection = course.curriculum[activeSectionIndex];
     if (activeLessonIndex < currentSection.lessons.length - 1) {
+      // Move to next lesson in the same section
       setActiveLessonIndex(activeLessonIndex + 1);
     } else if (activeSectionIndex < course.curriculum.length - 1) {
+      // Move to first lesson of the next section
       setActiveSectionIndex(activeSectionIndex + 1);
       setActiveLessonIndex(0);
       setExpandedSections({
@@ -865,6 +885,7 @@ const CourseVideoView = ({ onBack }) => {
               style={{ border: `3px solid ${moroccanColors.accent1}` }}
             >
               <VideoPlayer
+                ref={videoPlayerRef}
                 videoUrl={getActiveVideo()}
                 thumbnail={course.image}
                 title={activeLesson?.title}

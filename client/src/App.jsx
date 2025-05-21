@@ -27,6 +27,7 @@ import { ToastContainer } from 'react-toastify';
 import CategorieDetaille from './pages/CategorieDetaille';
 import CheckoutResult from './pages/CheckoutResult';
 import PaymentRedirect from './pages/PaymentRedirect';
+import Chatbot from './components/Chatbot';
 
 // Define InstructorRoute component
 const InstructorRoute = ({ children }) => {
@@ -209,6 +210,7 @@ function App() {
           </Routes>
         </main>
         {!isFullScreenRoute && <Footer />}
+        {!isFullScreenRoute && <Chatbot />}
       </div>
     </AuthProvider>
   );

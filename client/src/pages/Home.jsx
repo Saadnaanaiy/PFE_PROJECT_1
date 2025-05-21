@@ -1,9 +1,9 @@
 import Hero from '../components/Hero';
 import Categories from '../components/Categories';
-import CoursesList from '../pages/CoursesList';
-import FeaturedInstructors from '../components/FeaturedInstructors';
 import Testimonials from '../components/Testimonials';
 import CTASection from '../components/CTASection';
+import CoursesList from '../pages/CoursesList';
+
 
 // Sample courses data with Moroccan-themed items
 const courses = [

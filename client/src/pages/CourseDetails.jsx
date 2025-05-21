@@ -43,6 +43,7 @@ const CourseDetails = () => {
   const [error, setError] = useState(null);
   const [userRole, setUserRole] = useState(null); // 'instructeur', 'etudiant', or null
   const [isCourseFree, setIsCourseFree] = useState(false);
+  const [isEnrolled, setIsEnrolled] = useState(false); // Track if user is already enrolled
 
   // Initialize Echo for real-time messaging
   useEffect(() => {
@@ -169,6 +170,9 @@ const CourseDetails = () => {
 
         // Try to get current user information
         await checkUserRole();
+        
+        // Check if user is already enrolled in this course
+        await checkEnrollmentStatus(courseId);
 
         setError(null);
       } catch (err) {
@@ -181,6 +185,31 @@ const CourseDetails = () => {
 
     fetchCourseDetails();
   }, [courseId]);
+  
+  // Check if the user is already enrolled in this course
+  const checkEnrollmentStatus = async (courseId) => {
+    try {
+      // Only check enrollment if user is logged in
+      if (!user) {
+        setIsEnrolled(false);
+        return;
+      }
+      
+      // Get user's enrolled courses
+      const response = await axios.get('/api/enrolled-courses');
+      
+      if (response.data.success) {
+        const enrolledCourses = response.data.data.enrolled_courses;
+        // Check if this course ID is in the user's enrolled courses
+        const isAlreadyEnrolled = enrolledCourses.some(course => course.id === parseInt(courseId));
+        setIsEnrolled(isAlreadyEnrolled);
+        console.log('Enrollment status:', isAlreadyEnrolled ? 'Enrolled' : 'Not enrolled');
+      }
+    } catch (err) {
+      console.error('Error checking enrollment status:', err);
+      setIsEnrolled(false);
+    }
+  };
 
   // Check if all lessons in the course are free
   const checkIfCourseFree = (courseData) => {
@@ -259,19 +288,33 @@ const CourseDetails = () => {
   };
 
   const handleEnroll = async () => {
-    if (isCourseFree) {
-      // Navigate to the course learning page if free
+    if (!user) {
+      // Redirect to login if not logged in
+      navigate('/login', { state: { from: `/courses/${courseId}` } });
+      return;
+    }
+    
+    if (isCourseFree || isEnrolled) {
+      // Navigate to the course learning page if free or already enrolled
       navigate(`/course/${courseId}/learn`);
     } else {
-      // Navigate to payment page if not free
-     const response = await axios.post('/api/checkout');
-      console.log(response.data);
+      try {
+        // First add the course to cart if not already there
+        await axios.post('/api/cart/add', { cours_id: courseId });
+        
+        // Create Stripe checkout session
+        const response = await axios.post('/api/checkout');
+        console.log('Checkout response:', response.data);
 
-      // Redirect to Stripe's checkout page
-      if (response.data.url) {
-        window.location.href = response.data.url;
-      } else {
-        throw new Error('No checkout URL returned');
+        // Redirect to Stripe's checkout page
+        if (response.data.url) {
+          window.location.href = response.data.url;
+        } else {
+          throw new Error('No checkout URL returned');
+        }
+      } catch (err) {
+        console.error('Error during checkout process:', err);
+        alert('There was an error processing your enrollment. Please try again.');
       }
     }
   };
@@ -559,7 +602,7 @@ const CourseDetails = () => {
                     onClick={handleEnroll}
                     className="btn-primary w-full py-4 mb-4"
                   >
-                    {isCourseFree ? 'Go to Course' : 'Enroll Now'}
+                    {isEnrolled || isCourseFree ? 'Go to Course' : 'Enroll Now'}
                   </button>
                   <ul className="space-y-3 text-sm text-neutral-600">
                     <li className="flex items-center">

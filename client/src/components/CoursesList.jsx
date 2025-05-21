@@ -24,7 +24,7 @@ const CoursesList = ({ title, subtitle, courses, showViewAll = true }) => {
           </div>
 
           {showViewAll && (
-            <button className="btn-outline self-start md:self-auto">
+            <button className="certification-button self-start md:self-auto">
               View All Courses
             </button>
           )}
@@ -37,10 +37,10 @@ const CoursesList = ({ title, subtitle, courses, showViewAll = true }) => {
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`py-2 px-4 rounded-full whitespace-nowrap transition-colors ${
+                className={`py-2 px-4 rounded-md whitespace-nowrap transition-all duration-200 ${
                   activeTab === tab
-                    ? 'bg-primary text-white font-medium'
-                    : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
+                    ? 'bg-primary text-white font-medium shadow-sm hover:shadow-[-6px_0px_12px_rgba(0,98,51,0.6)]'
+                    : 'bg-white border border-neutral-200 text-neutral-700 hover:border-primary hover:shadow-[-6px_0px_12px_rgba(0,98,51,0.6)]'
                 }`}
               >
                 {tab}

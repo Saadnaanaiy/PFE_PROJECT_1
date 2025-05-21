@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import {
   FiPlay,
   FiPause,
@@ -9,13 +9,16 @@ import {
 } from 'react-icons/fi';
 import zelijBackground from '../assets/zelijBack.png';
 
-const VideoPlayer = ({
-  videoUrl,
-  title,
-  thumbnail,
-  previewOnly,
-  onComplete,
-}) => {
+const VideoPlayer = forwardRef((
+  {
+    videoUrl,
+    title,
+    thumbnail,
+    previewOnly,
+    onComplete,
+  },
+  ref
+) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -24,6 +27,28 @@ const VideoPlayer = ({
   const [showControls, setShowControls] = useState(true);
   const videoRef = useRef(null);
   const timerRef = useRef(null);
+  
+  // Expose methods to parent component
+  useImperativeHandle(ref, () => ({
+    play: () => {
+      if (videoRef.current) {
+        videoRef.current.play()
+          .then(() => setIsPlaying(true))
+          .catch(err => console.error('Error playing video:', err));
+      }
+    },
+    pause: () => {
+      if (videoRef.current) {
+        videoRef.current.pause();
+        setIsPlaying(false);
+      }
+    },
+    reset: () => {
+      if (videoRef.current) {
+        videoRef.current.currentTime = 0;
+      }
+    }
+  }));
 
   // Auto-hide controls after inactivity
   useEffect(() => {
@@ -240,6 +265,6 @@ const VideoPlayer = ({
       )}
     </div>
   );
-};
+});
 
 export default VideoPlayer;

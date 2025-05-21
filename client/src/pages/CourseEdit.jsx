@@ -13,6 +13,7 @@ import {
 } from 'react-icons/fi';
 import moroccanPattern from '../assets/moroccan-pattern.svg';
 import axios from 'axios';
+import { toast } from 'react-toastify';
 
 const CourseShow = () => {
   const { id } = useParams();
@@ -162,7 +163,7 @@ const CourseShow = () => {
         },
       });
 
-      navigate('/instructor/courses', {
+      navigate('/courses', {
         state: {
           message: isNewCourse
             ? 'Course created successfully'
@@ -170,6 +171,7 @@ const CourseShow = () => {
           type: 'success',
         },
       });
+      toast.success(isNewCourse ? 'Course created successfully' : 'Course updated successfully');
     } catch (err) {
       console.error('Error saving course:', err);
       setError(
@@ -709,3 +711,4 @@ const CourseShow = () => {
 };
 
 export default CourseShow;
+              

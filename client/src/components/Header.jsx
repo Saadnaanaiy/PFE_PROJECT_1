@@ -222,13 +222,35 @@ const Header = () => {
     }
   };
   
-  // Handle search input change
+  // Handle search input change with debounce
   const handleSearchChange = (e) => {
-    setSearchQuery(e.target.value);
-    if (e.target.value.trim() === '') {
+    const value = e.target.value;
+    setSearchQuery(value);
+    
+    if (value.trim() === '') {
       setSearchResults([]);
       setShowSearchResults(false);
+      return;
     }
+    
+    // Clear any existing timeout
+    if (window.searchTimeout) {
+      clearTimeout(window.searchTimeout);
+    }
+    
+    // Set a new timeout to perform the search after 300ms of inactivity
+    window.searchTimeout = setTimeout(async () => {
+      try {
+        setIsSearching(true);
+        const response = await axios.get(`http://localhost:8000/api/courses/search/${encodeURIComponent(value)}`);
+        setSearchResults(response.data.data);
+        setShowSearchResults(true);
+        setIsSearching(false);
+      } catch (error) {
+        console.error('Error searching courses:', error);
+        setIsSearching(false);
+      }
+    }, 300);
   };
   
   // Handle search submission
@@ -288,20 +310,29 @@ const Header = () => {
           <div className="hidden md:flex items-center space-x-8">
             <div className="relative">
               <form onSubmit={handleSearchSubmit} className="relative">
-                <input
-                  type="text"
-                  placeholder="Search for courses..."
-                  className="pl-10 pr-4 py-2 w-64 rounded-full border border-neutral-300 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                  value={searchQuery}
-                  onChange={handleSearchChange}
-                  ref={searchInputRef}
-                />
-                <button
-                  type="submit"
-                  className="absolute left-3 top-1/2 transform -translate-y-1/2 text-neutral-500"
-                >
-                  <FiSearch className="w-5 h-5" />
-                </button>
+                <div className="relative flex items-center">
+                  <input
+                    type="text"
+                    placeholder="Search for courses..."
+                    className="pl-10 pr-10 py-2 w-96 rounded-full border border-neutral-300 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                    value={searchQuery}
+                    onChange={handleSearchChange}
+                    ref={searchInputRef}
+                  />
+                  <button
+                    type="submit"
+                    className="absolute left-3 top-1/2 transform -translate-y-1/2 text-neutral-500"
+                  >
+                    <FiSearch className="w-5 h-5" />
+                  </button>
+                  
+                  {/* Green loading indicator */}
+                  {isSearching && (
+                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                      <div className="w-5 h-5 border-2 border-green-800 border-t-transparent rounded-full animate-spin"></div>
+                    </div>
+                  )}
+                </div>
               </form>
               
               {/* Search Results Dropdown */}

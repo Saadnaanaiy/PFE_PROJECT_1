@@ -33,7 +33,7 @@ h6 {
   }
 
   .btn-primary {
-    @apply btn bg-primary text-white hover:bg-primary-dark focus:ring-primary;
+    @apply btn bg-primary text-white hover:bg-primary-dark focus:ring-primary hover:shadow-[-6px_0px_12px_rgba(0,98,51,0.6)];
   }
 
   .btn-secondary {
@@ -41,7 +41,7 @@ h6 {
   }
 
   .btn-outline {
-    @apply btn border border-primary text-primary hover:bg-primary hover:text-white focus:ring-primary;
+    @apply btn border border-primary text-primary hover:bg-primary hover:text-white focus:ring-primary hover:shadow-[-6px_0px_12px_rgba(0,98,51,0.6)];
   }
 
   .container-custom {
@@ -62,6 +62,30 @@ h6 {
 
   .course-card {
     @apply bg-white rounded-lg overflow-hidden shadow-card transition-all duration-300 hover:shadow-card-hover;
+  }
+  
+  .certification-card {
+    @apply bg-white border border-neutral-200 rounded-lg overflow-hidden transition-all duration-300;
+  }
+  
+  .certification-card:hover {
+    @apply shadow-[-6px_0px_12px_rgba(0,98,51,0.6)] border-primary;
+  }
+  
+  .certification-header {
+    @apply bg-amber-50 p-4 border-b border-neutral-200;
+  }
+  
+  .certification-body {
+    @apply p-4;
+  }
+  
+  .certification-button {
+    @apply inline-flex items-center justify-center px-4 py-2 rounded-md font-medium transition-all duration-200 bg-white border border-neutral-200 text-neutral-800 hover:shadow-[-6px_0px_12px_rgba(0,98,51,0.6)] hover:border-primary;
+  }
+  
+  .certification-button:hover {
+    @apply shadow-[-6px_0px_12px_rgba(0,98,51,0.6)];
   }
 }
 

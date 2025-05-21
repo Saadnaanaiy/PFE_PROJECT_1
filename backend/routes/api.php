@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\CategorieController;
+use App\Http\Controllers\ChatbotController;
 use App\Http\Controllers\CoursController;
 use App\Http\Controllers\InstructorCourseController;
 use App\Http\Controllers\InstructorLessonController;
@@ -22,6 +23,7 @@ Route::post("/login", [UserController::class, "login"])->name("login");
 Route::get('/courses', [CoursController::class, 'index']);
 Route::get('/courses/search/{query}', [CoursController::class, 'search']);
 Route::get('/courses/{id}', [CoursController::class, 'show']);
+Route::get('/courses/{id}/check-enrollment', [CoursController::class, 'checkEnrollment'])->middleware('auth:sanctum');
 Route::match(['put','patch'], 'courses/{course}', [CoursController::class, 'updateProgress']);
 Route::get('/categories', [CoursController::class, 'getCategories']);
 Route::get('/courses/{id}/forums', [CoursController::class, 'getForums']);
@@ -40,6 +42,9 @@ Route::get('/payment/success', [PaymentController::class, 'success'])->name('pay
 Route::get('/payment/cancel', [PaymentController::class, 'cancel'])->name('payment.cancel');
 Route::get("/instructors", [UserController::class, "getInstructors"]);
 
+// Chatbot routes
+Route::post('/chatbot/query', [ChatbotController::class, 'processQuery']);
+
 // Protected routes
 Route::middleware('auth:sanctum')->group(function () {
     Route::get("/user", [UserController::class, "profile"]);
@@ -51,6 +56,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get("/instructors/{user}", [UserController::class, "show"]);
     Route::post("/logout", [UserController::class, "logout"]);
 
+    
 
     // Forum route
     Route::post('/courses/{id}/forums', [CoursController::class, 'createForum']);
@@ -69,6 +75,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/discussions/{discussionId}/typing', [MessageController::class, 'typing']);
 
     Route::post('/checkout', [PaymentController::class, 'createCheckoutSession']);
+    Route::post('/checkout/course/{courseId}', [PaymentController::class, 'createSingleCourseCheckout']);
 
     // Payment history
     Route::get('/payment/history', [PaymentController::class, 'getPaymentHistory']);
